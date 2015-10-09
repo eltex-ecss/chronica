@@ -1,0 +1,22 @@
+#!/bin/bash
+### -*- coding: utf-8 -*-
+### @author Demidenko Alexander
+### @copyright (C) 2015, Eltex, Novosibirsk, Russia
+### @doc
+###
+### @end
+###-------------------------------------------------------------------
+_help()
+{
+    echo "Usage: $0 <NodeName> <Mask> <Severity>"
+    exit 1
+}
+
+if [ -z "$3" ]
+then
+    _help
+fi
+
+PREFIX=$(cd $(dirname $0); pwd)
+
+$PREFIX/grab_bin_log "$@" | binarylog2text

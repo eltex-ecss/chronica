@@ -1,0 +1,52 @@
+#!/bin/bash
+### -*- coding: utf-8 -*-
+### @author Demidenko Alexander
+### @copyright (C) 2015, Eltex, Novosibirsk, Russia
+### @doc
+###
+### @end
+###-------------------------------------------------------------------
+_help()
+{
+    echo "Usage: $0 <NodeName> <Mask> <Severity>"
+    exit 1
+}
+
+if [ -z "$1" ]
+then
+    _help
+else
+    arr=( $(echo $1 | tr '@' ' ') )
+
+    HOST=${arr[1]}
+
+    if [ -z $HOST ]
+    then
+        _help
+    else
+        NODE=${arr[0]}
+    fi
+
+    shift
+fi
+
+if [ -z "$1" ]
+then
+    _help
+else
+    MASK="$1"
+    shift
+fi
+
+if [ -z "$1" ]
+then
+    _help
+else
+    SEVERITY=$1
+    shift
+fi
+
+NAME=`date +"%T"`
+PREFIX=$(cd $(dirname $0); pwd)
+PORT=`$PREFIX/epmd_get_port_by_name.erl log_grabber_$NODE $HOST`
+echo -n "who are you start ${NAME} "${MASK}" ${SEVERITY} binary" | netcat -q 31536000 $HOST $PORT

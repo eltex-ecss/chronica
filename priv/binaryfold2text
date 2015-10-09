@@ -1,0 +1,40 @@
+#!/bin/bash
+### -*- coding: utf-8 -*-
+### @author Timofey Barmin
+### @copyright (C) 2015, Eltex, Novosibirsk, Russia
+### @doc
+###
+### @end
+###-------------------------------------------------------------------
+
+_help()
+{
+    echo "Script for processing logs folder"
+    echo "Use:"
+    echo "  cd ./logs"
+    echo "  binaryfold2text.sh"
+    exit 1
+}
+
+if [ "$1" == "help" ]
+then
+    _help
+fi
+## Processing file end of .bin (info.log.bin -> info.log)
+for file in *.bin;
+do
+    echo Convert $file to "${file%.*}"
+    ./binarylog2text ./$file >> "${file%.*}"
+    rm $file;
+done
+
+## Processing file end of .bin.Num (info.log.bin.11 -> info.log.11)
+for file in *.bin.*;
+do
+    echo Convert $file to "${file%.bin*}"."${file#*bin.}"
+    ./binarylog2text ./$file >> "${file%.bin*}"."${file#*bin.}"
+    rm $file;
+done
+
+## Delete empty files
+find -type f -size -1b -exec rm {} +

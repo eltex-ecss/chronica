@@ -1,0 +1,140 @@
+#!/usr/bin/env escript
+%%! -noinput +pc unicode
+%%% @author Timofey Barmin, Nikita Roshchupkin
+%%% @copyright (C) 2015, Eltex, Novosibirsk, Russia
+%%% @doc
+%%%
+%%% @end
+%%%-------------------------------------------------------------------
+-module(binarylog2text).
+-export([main/1]).
+-mode(compile).
+
+-define(read_at_once, 1000000).
+
+main([Filename, Output]) ->
+    try
+        io:setopts([{encoding, utf8}]),
+        {ok, In}  = file:open(Filename, [read, binary, raw]),
+        {ok, Out} = file:open(Output, [write, {encoding, utf8}]),
+
+        ReadFun  = fun () -> file:read(In, ?read_at_once) end,
+        WriteFun = fun (Data) -> io:put_chars(Out, [Data]) end,
+
+        process(ReadFun, WriteFun, <<>>, 0),
+
+        file:sync(Out),
+        file:close(In),
+        file:close(Out)
+    catch
+        _:Error ->
+            io:format("Error: ~p~nStacktrace: ~p~n", [Error, erlang:get_stacktrace()])
+    end;
+
+main([Command]) when Command == "help"; Command == "h" ->
+    io:format("Get the binary log in the text format~n"
+    "Usage: [cat Filename | ./binarylog2text] | [Filename] | [Filename, Output]~n");
+
+main([Filename]) ->
+    try
+        io:setopts([{encoding, utf8}]),
+        {ok, In} = file:open(Filename, [read, binary, raw]),
+        Port     = open_port( {fd,0,1}, [stream, binary, in, out, nouse_stdio, eof] ),
+
+        ReadFun   = fun () -> file:read(In, ?read_at_once) end,
+        WriteFun  = fun (Data) -> io:format("~ts", [Data]) end,
+
+        process(ReadFun, WriteFun, <<>>, 0),
+
+        port_close(Port),
+        file:close(In)
+    catch
+        _:Error ->
+            io:format("Error: ~p~nStacktrace: ~p~n", [Error, erlang:get_stacktrace()])
+    end;
+
+main([]) ->
+    try
+        io:setopts([{encoding, utf8}]),
+        Port = open_port( {fd,0,1}, [stream, binary, in, out, nouse_stdio, eof] ),
+
+        ReadFun   = fun () -> readport(Port) end,
+        WriteFun  = fun (Data) -> io:format("~ts", [Data]) end,
+
+        process(ReadFun, WriteFun, <<>>, 0),
+
+        port_close(Port)
+
+    catch
+        _:Error ->
+            io:format("Error: ~p~nStacktrace: ~p~n", [Error, erlang:get_stacktrace()])
+    end.
+
+process(ReadFun, WriteFun, Buf, N) ->
+    case ReadFun() of
+        eof ->
+            {ok, N};
+        {ok, D} ->
+            case format_buff2(WriteFun, <<Buf/binary, D/binary>>, N) of
+                {ok, NewBuff, NewN} ->
+                    process(ReadFun, WriteFun, NewBuff, NewN);
+                {error, Reason, NewN} ->
+                    {error, Reason, NewN}
+            end
+    end.
+
+format_buff2(WriteFun, Buff, N) ->
+    case unframe(Buff, WriteFun) of
+        {ok, Msg, NewBuf} ->
+            try
+                MsgTerm = binary_to_term(Msg),
+                WriteFun(default(MsgTerm))
+            catch
+                _:E ->
+                    io:format("Error ~p while processing record #~p~n ~p~n", [E, N, erlang:get_stacktrace()])
+            end,
+            format_buff2(WriteFun, NewBuf, N + 1);
+        {more, NewBuf} ->
+            {ok, NewBuf, N};
+        {error, Data} ->
+            io:format("Error~n"),
+            {error, {bad_data, Data}, N}
+    end.
+
+readport(Port) ->
+    receive
+        {Port, {data, Data}} ->
+            {ok, Data};
+        {Port, closed} ->
+            eof;
+        {'EXIT', Port, _} ->
+            eof;
+        {Port, eof} ->
+            eof
+    end.
+
+unframe(<<16#AB, 16#CD, 16#EF, Size:32, Data:Size/binary, Tail/bytes>>, _WriteFun) -> {ok, Data, Tail};
+unframe(<<A, B, C, _Size:32, _Tail/bytes>> = Data, WriteFun) when A =/= 16#AB; B =/= 16#CD; C =/= 16#EF ->
+    {NewData, Skiped} = search_frame_start(Data),
+    WriteFun(Skiped),
+    unframe(NewData, WriteFun);
+unframe(Data, _WriteFun) -> {more, Data}.
+
+search_frame_start(Data) -> search_frame_start_(Data, <<>>).
+
+search_frame_start_(Data, Res) when size(Data) < 7 -> {Data, Res};
+search_frame_start_(<<16#AB, 16#CD, 16#EF, Size:32, _:Size/binary, _Tail/bytes>> = Data, Res) -> {Data, Res};
+search_frame_start_(<<E, Tail/bytes>>, Res) -> search_frame_start_(Tail, <<Res/binary, E>>).
+
+default({{{Y,Mo,D},{H,Mi,S},Ms}, Priority, Module, Pid, Line, _File, _Function, {F, A}}) ->
+    UserStr = io_lib:format(F, A),
+    io_lib:format("~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B:~6.10.0B ~s ~p [~w:~b]: ~ts~n", [Y, Mo, D, H, Mi, S, Ms, get_priority_prefix_up(Priority), Pid, Module, Line, UserStr]).
+
+get_priority_prefix_up(Priority) ->
+    case Priority of
+        1 -> "ERROR";
+        2 -> "WARN ";
+        3 -> "INFO ";
+        4 -> "TRACE";
+        5 -> "DEBUG"
+    end.

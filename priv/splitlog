@@ -1,0 +1,58 @@
+#!/usr/bin/awk -f
+### -*- coding: utf-8 -*-
+### @author Demidenko Alexander
+### @copyright (C) 2015, Eltex, Novosibirsk, Russia
+### @doc
+###
+### @end
+###-------------------------------------------------------------------
+BEGIN {
+    if ($1 == help) {
+        print "Use:"
+        print " splitlog <Filename>"
+        exit
+    }
+    print "Parse and toss ssw log files ver 1.1 (c) Hurd"
+    FOLDER = "out"
+    FCMDMV = "_cmd_mv"
+    FCMDMK = "_cmd_mk"
+    FMAP[0,0] = ""
+    PMAP[0,0] = ""
+    LT_LIST[0] = ""
+    FOUT = FOLDER"/build_info"
+
+    ## Подчистить старые логи
+    system("rm -Rf "FOLDER"; mkdir "FOLDER)
+}
+
+END {
+    print "done"
+}
+
+# Основной цикл - Распарсить логи, по контекстам процессов
+{
+    if ($1 ~ /201.+/ && $4 ~ /<.+>/) {
+        FOUT = $4
+    }
+    split_flow()
+    print $0 >> FOLDER"/"FOUT
+    post_process()
+    close(FOLDER"/"FOUT)
+}
+
+function split_flow() {
+    if ($0 ~ /.*> handle_amqp_message.+/) {
+        print "******************************************" >> FOLDER"/"FOUT
+    } else {
+        if ($0 ~ /.*> handle_.+/) {
+            print "*" >> FOLDER"/"FOUT
+        }
+    }
+}
+
+function post_process() {
+    if ($0 ~ /.*< decode.+/) {
+        split($0, R, ", Result: ")
+        print $1" "$2" "$3" "$4" "$5" MSG_IN: "R[2] >> FOLDER"/"FOUT
+    }
+}
