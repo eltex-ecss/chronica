@@ -50,7 +50,7 @@ get_event(Buffer, Id) ->
 
 -record(s, {
         max_events :: non_neg_integer(),
-        events = queue:new() :: queue(),
+        events = queue:new(),
         num = 0 :: non_neg_integer(),
         current_id = 0 :: non_neg_integer()
     }).
