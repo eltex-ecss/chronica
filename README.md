@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://raw.githubusercontent.com/eltex-ecss/chronica/master/doc/chronica.jpg" width="600" height="700"/>
+<img src="https://raw.githubusercontent.com/eltex-ecss/chronica/master/doc/chronica.jpg"/>
 </p>
 
 ##Общее представление
@@ -7,7 +7,7 @@ Chronica это специальный фреймворк используемы
 Он осуществляет более простой способ введения журналов в Erlang-приложениях. 
 
 ##Особенности
-* [Быстрее, легче, гибче!](https://github.com/eltex-ecss/chronica/blob/master/doc/test_and_history.docx)
+* [Быстрее, легче, гибче!](https://docs.google.com/document/d/1S4-Yf799d5SDCWhr78Fsm6-EY98gd1BRW-Qffaynzsc/edit?usp=sharing)
 * Возможность создавать множество потоков записей, правил вывода и форматов вывода
 * Возможность задавать формат для каждого backend'а индивидуально
 * Поддержка удаленного “отщепления” потока логов с фильтрацией
@@ -38,7 +38,7 @@ Chronica это специальный фреймворк используемы
 
 Также для проекта требуется конфигурационный файл. В него нужно добавить секцию {chronica, [] }, в которой 
 прописываются конфигурационные данные. При его отсутствии, используются настройки 
-[по умолчанию](https://github.com/eltex-ecss/chronica/blob/master/doc/default_sys.config.docx).
+[по умолчанию](https://docs.google.com/document/d/1rbyXuQpUG4AU5piE7DntZchyaaHTq9I9tdA0ENsLx1o/edit?usp=sharing).
 
 Фреймворк chronica поддерживает следующие уровни логирования:
 ```erlang
@@ -74,7 +74,7 @@ LEVEL(Format, Args)
 
 ##Конфигурационный файл
 Для ознакомления со всеми возможностями настройки 
-[sys_doc.config](https://github.com/eltex-ecss/chronica/blob/master/doc/sys_doc.config.docx)
+[sys_doc.config](https://docs.google.com/document/d/1KGyZaVDFBSaXS7cVJkprtNsvOFvhHXnTmZ4qR4WmxM8/edit?usp=sharing)
 
 ##%stack
 Из-за того, что в Chronica вычисление аргументов при вызове log:Level(), где Level это 
@@ -210,5 +210,5 @@ applications, на ряду с kernel и stdlib).
 Теги константные<br>
 Регистрация модулей<br>
 <p align="center">
-<img src="https://github.com/eltex-ecss/chronica/blob/master/doc/logo_eltex.jpg" width="600" height="700" align="middle"/>
+<img src="https://github.com/eltex-ecss/chronica/blob/master/doc/logo_eltex.jpg"/>
 </p>
