@@ -36,8 +36,8 @@ register() ->
             {error, no_application}
     end.
 
+-dialyzer({no_match, register/1}).
 -spec register(atom()) -> no_return().
-
 register(App) ->
     true = chronica_status:configured(),
     chronica_manager:add_application(App).
