@@ -226,7 +226,11 @@ get_application_build_info(AppName) ->
             Module -> Module:build_info()
         end
     catch
-        _:_E -> [{error, lists:flatten(io_lib:format("can't get build info for application ~p cause ~p", [AppName, _E]))}]
+        _:Error -> [{error,
+                  lists:flatten(
+                    io_lib:format("can't get build info for application ~p cause ~p",
+                                  [AppName, Error]))
+                 }]
     end.
 
 find_latest_build_info([], Res) -> Res;
