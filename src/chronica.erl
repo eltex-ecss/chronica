@@ -36,7 +36,7 @@ register() ->
             {error, no_application}
     end.
 
--spec register(atom()) -> ok | {error, term()}.
+-spec register(atom()) -> no_return().
 
 register(App) ->
     true = chronica_status:configured(),
