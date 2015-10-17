@@ -52,6 +52,7 @@ init(Params) ->
     end.
 
 
+-dialyzer({no_match, close/0}).
 -spec close() -> ok | {error, term()}.
 close() ->
     Handle =

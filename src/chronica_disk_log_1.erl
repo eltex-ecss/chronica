@@ -101,10 +101,10 @@ logl([X | T], Bs, Size) ->
     BSz = <<Sz:?SIZESZ/unit:8>>,
     NBs = case Sz < ?MIN_MD5_TERM of
               true ->
-                  [Bs, BSz, ?BIGMAGICHEAD | X];
+                  [Bs, BSz, ?BIGMAGICHEAD, X];
               false ->
                   MD5 = erlang:md5(BSz),
-                  [Bs, BSz, ?BIGMAGICHEAD, MD5 | X]
+                  [Bs, BSz, ?BIGMAGICHEAD, MD5, X]
               end,
     logl(T, NBs, Size + ?HEADERSZ + Sz);
 logl([], Bs, Size) ->
@@ -600,6 +600,10 @@ done_scan(In, Out, OutName, FName, RecoveredTerms, BadChars) ->
             throw(Error)
     end.
 
+-spec repair_err(In :: file:io_device(), Out :: #cache{},
+                 OutName :: nonempty_string(),
+                 ErrFileName :: nonempty_string(),
+                 _Error) -> no_return().
 repair_err(In, Out, OutName, ErrFileName, Error) ->
     file:close(In),
     catch fclose(Out, OutName),
@@ -1238,8 +1242,8 @@ write_index_file(read_write, FName, NewFile, OldFile, OldCnt) ->
         file_error(FileName, E)
     end.
 
-to_8_bytes(<<N:32, T/binary>>, NT, FileName, Fd) ->
-    to_8_bytes(T, [NT | <<N:64>>], FileName, Fd);
+to_8_bytes(<<N:32,T/binary>>, NT, FileName, Fd) ->
+    to_8_bytes(T, [NT, <<N:64>>], FileName, Fd);
 to_8_bytes(B, NT, _FileName, _Fd) when byte_size(B) =:= 0 ->
     NT;
 to_8_bytes(_B, _NT, FileName, Fd) ->
@@ -1383,7 +1387,7 @@ ext_split_bins(MaxBs, IsFirst, First, [X | Last], Bs, N) ->
     NBs = Bs + byte_size(X),
     if
         NBs =< MaxBs ->
-        ext_split_bins(MaxBs, IsFirst, [First | X], Last, NBs, N+1);
+        ext_split_bins(MaxBs, IsFirst, [First, X], Last, NBs, N+1);
     IsFirst, First =:= [] ->
             % To avoid infinite loop - we allow the file to be
            % too big if it's just one item on the file.
@@ -1405,14 +1409,14 @@ int_split_bins(MaxBs, IsFirst, First, [X | Last], Bs, N) ->
     BSz = <<Sz:?SIZESZ/unit:8>>,
     XB = case Sz < ?MIN_MD5_TERM of
              true ->
-                 [BSz, ?BIGMAGICHEAD | X];
+                 [BSz, ?BIGMAGICHEAD, X];
              false ->
                  MD5 = erlang:md5(BSz),
-                 [BSz, ?BIGMAGICHEAD, MD5 | X]
+                 [BSz, ?BIGMAGICHEAD, MD5, X]
          end,
     if
         NBs =< MaxBs ->
-        int_split_bins(MaxBs, IsFirst, [First | XB], Last, NBs, N+1);
+        int_split_bins(MaxBs, IsFirst, [First, XB], Last, NBs, N+1);
     IsFirst, First =:= [] ->
             % To avoid infinite loop - we allow the file to be
            % too big if it's just one item on the file.

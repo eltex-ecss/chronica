@@ -45,7 +45,7 @@
 -callback handle_clear(Handler :: module()) ->
     ok | {error, _Reason}.
 
--callback handle_check(Handler :: module()) ->
+-callback handle_check(Handler :: module() | binary()) ->
     boolean().
 
 -callback handle_rotate(Handler :: module()) ->

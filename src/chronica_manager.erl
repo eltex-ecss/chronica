@@ -48,16 +48,24 @@
     terminate/2
 ]).
 
+-export_type(
+   [
+    rule/0
+   ]
+  ).
+
 -define(wait_before_close_output_at_cfg_reload_timeout, 300000).
 -define(wait_before_close_output_at_stop_timeout, 0).
 -define(save_cache_timeout, 10000).
 -define(check_log_backend_timeout, 60000).
 
+
+-type rule() :: string() | {string(), rule()} | {string(), rule(), rule()}.
 -record(rule,
     {
-        id :: integer(),
-        rule_str :: string(),
-        log_priority :: integer(),
+        id = 0 :: integer(),
+        rule_str = "*"   :: rule(),
+        log_priority = 0 :: integer(),
         flows :: [term()]
     }).
 
@@ -955,13 +963,9 @@ load_config(State = #config_state{loaded_config = LoadedConfig = #chronica_confi
     end.
 
 get_all_flows(Rules) ->
-    FlowHandlesDublicated =
-        [
-            Handle
-
-            ||
-
-            {_Format, Handle}  <- lists:foldl(fun (#rule{flows = Flows}, Acc) -> Flows ++ Acc end, [], Rules)
+    FlowHandlesDublicated = [ Handle || {_Format, Handle}  <-
+        lists:foldl(
+          fun (#rule{flows = Flows}, Acc) -> Flows ++ Acc end, [], Rules)
         ],
     lists:usort(FlowHandlesDublicated).
 
@@ -1020,65 +1024,45 @@ switch_off() ->
 
 get_appropriate_flows(_Key, _Priority, null) -> [];
 get_appropriate_flows([], _Priority, _Rules) -> [];
-get_appropriate_flows([K|_] = Keys, Priority, Rules) when is_list(Keys), is_atom(K) ->
-    ?INT_DBG("get_appropriate_flows for: ~p", [Keys]),
-    Res = lists:foldl(fun (P, Acc) -> get_appropriate_flows(P, Priority, Rules) ++ Acc end, [], Keys),
-    lists:usort(Res);
 get_appropriate_flows(Key, Priority, Rules) when is_atom(Key) ->
     ?INT_DBG("get_appropriate_flows for: ~p", [Key]),
-    Res = lists:foldl(
-        fun (#rule{rule_str = RuleStr, log_priority = LPriority, flows = Flows}, Acc) ->
-            case LPriority >= Priority of
-                true ->
-                    case rule_match(RuleStr, atom_to_list(Key)) of
-                        true ->
-                            Flows ++ Acc;
-                        false ->
-                            Acc
-                    end;
-                false ->
-                    Acc
-            end
-        end,
-        [],
-        Rules
-    ),
-    lists:usort(Res);
+    KeyStr = atom_to_list(Key),
+    lists:usort([ Flows || #rule{flows = Flows} <-
+        lists:filter(
+            fun(#rule{rule_str = RuleStr, log_priority = LPriority}) ->
+                    LPriority >= Priority andalso rule_match(RuleStr, KeyStr)
+            end, Rules) ]);
+get_appropriate_flows([K|_] = Keys, Priority, Rules) when is_list(Keys), is_atom(K) ->
+    ?INT_DBG("get_appropriate_flows for: ~p", [Keys]),
+    lists:flatten(lists:usort([ get_appropriate_flows(Key, Priority, Rules) ||
+                                Key <- Keys ]));
 get_appropriate_flows(Key, _, _) ->
     erlang:error({bad_tags, Key}).
 
-rule_match(Rule, Key) ->
-    rule_match_(Rule, Key).
-
-% Rule is list of tree, key is string
-rule_match_(Rule, Key) when is_list(Rule) ->
+%% @doc Rule is list of tree, key is string
+-spec rule_match(Rule :: rule(), Key :: string()) -> boolean().
+rule_match(Rule, Key) when is_list(Rule) ->
     rule_match2(Key, tokens(Rule));
-rule_match_({"!", {Rule}}, Key) ->
-    not rule_match_(Rule, Key);
-rule_match_({"&", {Op1, Op2}}, Key) ->
-    rule_match_(Op1, Key) andalso rule_match_(Op2, Key);
-rule_match_({"|", {Op1, Op2}}, Key) ->
-    rule_match_(Op1, Key) orelse rule_match_(Op2, Key).
+rule_match({"!", {Rule}}, Key) ->
+    not rule_match(Rule, Key);
+rule_match({"&", {Op1, Op2}}, Key) ->
+    rule_match(Op1, Key) andalso rule_match(Op2, Key);
+rule_match({"|", {Op1, Op2}}, Key) ->
+    rule_match(Op1, Key) orelse rule_match(Op2, Key).
 
+tokens([$! | Tail]) ->
+    {Res, TmpList} = tokens_(Tail),
+    ["!", TmpList | Res];
 tokens(Rule) ->
-    NewRule = case Rule of
-                [$! | Tail] -> Tail;
-                _ -> Rule
-              end,
-
-    {Res, TmpList} = lists:foldr(
-        fun (Char, {Res, TmpList}) ->
-            case Char of
-                $* -> {[ [$*], TmpList | Res ], []};
-                $? -> {[ [$?], TmpList | Res], []};
-                _ -> {Res, [Char | TmpList]}
-            end
-        end, {[], []}, NewRule),
-
-    case Rule of
-        [$! | _] -> ["!", TmpList | Res];
-        _ -> [TmpList | Res]
-    end.
+    {Res, TmpList} = tokens_(Rule),
+    [TmpList | Res].
+tokens_(Rule) ->
+    lists:foldr(
+      fun (Char, {Res, TmpList}) when Char == $* orelse Char == $? ->
+              {[ [Char], TmpList | Res ], []};
+          (Char, {Res, TmpList}) ->
+              {Res, [Char | TmpList]}
+      end, {[], []}, Rule).
 
 rule_match2(Key, ["!" | TokensTail]) ->
     not rule_match2(Key, TokensTail);
@@ -1520,7 +1504,6 @@ parse_binary_op({Op1, {P1}}, Op) ->
     {Op1, {parse_binary_op(P1, Op)}};
 parse_binary_op(List, Op) when is_list(List) ->
     case string:tokens(List, Op) of
-        [[First]] when is_list(First) -> parse_binary_op(First, Op);
         [First] ->
             lists:map(
                 fun ([E]) when is_list(E) -> parse_binary_op(E, Op);
