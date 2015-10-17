@@ -513,7 +513,7 @@ check_arg([{size, Int}|Tail], Res) when is_integer(Int), Int > 0 ->
     check_arg(Tail, Res#arg{size = Int});
 check_arg([{size, infinity}|Tail], Res) ->
     check_arg(Tail, Res#arg{size = infinity});
-check_arg([{size, {MaxB,MaxF}}|Tail], Res)
+check_arg([{size, {MaxB, MaxF}}|Tail], Res)
   when is_integer(MaxB), is_integer(MaxF),
        MaxB > 0, MaxB =< ?MAX_BYTES, MaxF > 0, MaxF < ?MAX_FILES ->
     check_arg(Tail, Res#arg{size = {MaxB, MaxF}});
@@ -544,12 +544,12 @@ check_arg([{mode, read_write}|Tail], Res) ->
 check_arg(Arg, _) ->
     {error, {badarg, Arg}}.
 
-check_wrap_arg({ok, Res}, {0,0}, _Version) when Res#arg.size =:= infinity ->
+check_wrap_arg({ok, Res}, {0, 0}, _Version) when Res#arg.size =:= infinity ->
     {error, {badarg, size}};
 check_wrap_arg({ok, Res}, OldSize, Version) when Res#arg.size =:= infinity ->
     NewRes = Res#arg{size = OldSize},
     check_wrap_arg({ok, NewRes}, OldSize, Version);
-check_wrap_arg({ok, Res}, {0,0}, Version) ->
+check_wrap_arg({ok, Res}, {0, 0}, Version) ->
     {ok, Res#arg{version = Version}};
 check_wrap_arg({ok, Res}, OldSize, Version) when OldSize =:= Res#arg.size ->
     {ok, Res#arg{version = Version}};
@@ -618,7 +618,7 @@ handle({From, {blog, B}}, S) ->
 handle({alog, B}, S) ->
     case get(log) of
         L when L#log.mode =:= read_only ->
-            notify_owners({read_only,B}),
+            notify_owners({read_only, B}),
             loop(S);
         L when L#log.status =:= ok, L#log.format =:= internal ->
             log_loop(S, [], [B], []);
@@ -634,7 +634,7 @@ handle({alog, B}, S) ->
 handle({balog, B}, S) ->
     case get(log) of
         L when L#log.mode =:= read_only ->
-            notify_owners({read_only,B}),
+            notify_owners({read_only, B}),
             loop(S);
         L when L#log.status =:= ok ->
             log_loop(S, [], [B], []);
@@ -954,7 +954,7 @@ log_loop(S, Pids, Bins, Sync) ->
     log_loop(M, Pids, Bins, Sync, S1, get(log)).
 
 %% Items logged after the last sync request found are sync:ed as well.
-log_loop({alog,B}, Pids, Bins, Sync, S, L) when L#log.format =:= internal ->
+log_loop({alog, B}, Pids, Bins, Sync, S, L) when L#log.format =:= internal ->
     %% {alog, _} allowed for the internal format only.
     log_loop(S, Pids, [B | Bins], Sync);
 log_loop({balog, B}, Pids, Bins, Sync, S, _L) ->
@@ -1282,7 +1282,7 @@ check_head({head, Term}, internal) ->
 check_head(_Head, _Format) ->
     {error, {badarg, head}}.
 
-check_size(wrap, {NewMaxB,NewMaxF}) when
+check_size(wrap, {NewMaxB, NewMaxF}) when
       is_integer(NewMaxB), is_integer(NewMaxF),
       NewMaxB > 0, NewMaxB =< ?MAX_BYTES, NewMaxF > 0, NewMaxF < ?MAX_FILES ->
     ok;
@@ -1842,8 +1842,7 @@ nearby_pid(Log, Node) ->
             get_near_pid(Pids, Node)
     end.
 
--spec get_near_pid([pid(),...], node()) -> pid().
-
+-spec get_near_pid([pid(), ...], node()) -> pid().
 get_near_pid([Pid | _], Node) when node(Pid) =:= Node -> Pid;
 get_near_pid([Pid], _ ) -> Pid;
 get_near_pid([_ | T], Node) -> get_near_pid(T, Node).

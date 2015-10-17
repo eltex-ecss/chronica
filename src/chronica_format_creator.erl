@@ -70,7 +70,7 @@ create_format_function(
     end,
     ?INT_DBG("BinaryStr: ~p~n~n", [lists:flatten(BinaryStr)]),
     FunctionStr = FormattingStr ++ BinaryStr,
-    [AstStr] = pt_lib:str2ast(io_lib:format(FunctionStr, [FunName]),0),
+    [AstStr] = pt_lib:str2ast(io_lib:format(FunctionStr, [FunName]), 0),
     AstStr.
 
 priority_color(FunColor) ->
@@ -260,7 +260,7 @@ get_color([{background, Color} | Tail], Acc) ->
 get_color([{bold, Bold} | Tail], Acc) ->
     get_color(Tail, concat_color(get_bold(Bold), Acc));
 get_color([Head | _Tail], _Acc) ->
-    throw({invalid_colors_spec, {invalid_param,Head}});
+    throw({invalid_colors_spec, {invalid_param, Head}});
 get_color(ColorsSpec, _Acc) ->
     throw({invalid_colors_spec, ColorsSpec}).
 
@@ -346,13 +346,13 @@ insert_tab_([$%, $% | F], Res) ->
     try
         lists:reverse(Res) ++ Rest
     catch
-        _:_ -> insert_tab_(Rest, lists:reverse(TabStr) ++ [$%,$%, Res])
+        _:_ -> insert_tab_(Rest, lists:reverse(TabStr) ++ [$%, $%, Res])
     end;
 insert_tab_([C | F], Res) -> insert_tab_(F, [C | Res]).
 
 run([], Res, Mode, _FunColor) ->
    {Res, Mode};
-run([$%,$% | F], [{Formated, Args} | Res], Mode, FunColor) ->
+run([$%, $% | F], [{Formated, Args} | Res], Mode, FunColor) ->
     run(F, [{Formated ++ [$%, $%], Args} | Res], Mode, FunColor);
 
 run([$% | F], [{Formated, Args} | Res], Mode, FunColor) ->

@@ -208,7 +208,7 @@ handle_call(#initialize_sync{}, _Flows, State = #config_state{
     Cache = load_cache(CacheDir, ConfigHash),
     AppListToRegister = application:loaded_applications(),
     AddApplicationFun =
-        fun({AppL,_,_}, {RAppsL, CacheL}) ->
+        fun({AppL, _, _}, {RAppsL, CacheL}) ->
             {_, {RAppsL2, CacheL2}} = add_application(AppL, RAppsL, Rules, CacheL, Detail_info),
             {RAppsL2, CacheL2}
         end,
@@ -488,129 +488,127 @@ start(State, Config) ->
         Err -> Err
     end.
 
-
-get_app_env(Opt, Default) ->
-    ?INT_DBG("get_app_env: ~p~n", [Opt]),
-    case application:get_env(chronica, Opt) of
-        {ok, Val} -> Val;
-        _Error -> Default
-    end.
+-spec default_env(Property :: atom()) -> term().
+default_env(active)          -> true;
+default_env(backend_modules) -> [];
+default_env(colored)         -> false;
+default_env(data_root)       -> "./cache_<Node>/";
+default_env(detail_info)     -> false;
+default_env(log_root)        -> "./log_<Node>/";
+default_env(max_file_num)    -> 10;
+default_env(max_file_size)   -> 10 * 1024 * 1024;
+default_env(rotate_at_start) -> false;
+default_env(tcp_host)        -> any;
+default_env(tcp_port)        -> 0;
+default_env(tty_enabled)     -> true;
+default_env(flows) ->
+    [
+     {file_info_log,   [{file, "console.log"}]},
+     {error_log,       [{file, "error.log"}]},
+     {screen_info_log, [{tty, short}]}
+    ];
+default_env(formats) ->
+    [
+     {short, "%H:%Mi:%S.%Ms [%Priority] %Message\n"}
+    ];
+default_env(internal_logger) ->
+    [
+     {file, "chronica", {101048576, 1}, info},
+     {tty, error}
+    ];
+default_env(rules) ->
+    [
+     {file_info_log,   "*", info,  [file_info_log], on},
+     {error_log,       "*", error, [error_log], on},
+     {screen_info_log, "*", info,  [screen_info_log], on}
+    ];
+default_env(V) ->
+    throw({not_found, V}).
 
 -spec read_config(Now :: term()) -> {ok, #chronica_config{}} | {error, term()}.
 read_config(Now) ->
     try
-        Get =
-            fun (V) ->
-                try
-                    case get_app_env(V, {error, not_found}) of
-                        {error, not_found} ->
-                            case V of % default config values:
-                                active -> true;
-                                detail_info -> false;
-                                rotate_at_start -> false;
-                                tty_enabled -> true;
-                                tcp_port -> 0;
-                                internal_logger -> [{file,"chronica",{101048576,1},info},
-                                    {tty,error}];
-                                max_file_size -> 10 * 1024 * 1024;
-                                max_file_num -> 10;
-                                tcp_host -> any;
-                                backend_modules -> [];
-                                colored -> false;
-                                data_root -> "./cache_<Node>/";
-                                log_root -> "./log_<Node>/";
-                                rules -> [
-                                    {file_info_log,     "*",    info,  [file_info_log], on},
-                                    {error_log,    "*",    error, [error_log], on},
-                                    {screen_info_log,     "*",    info,  [screen_info_log], on}
-                                ];
-                                flows -> [
-                                    {file_info_log, [{file, "console.log"}]},
-                                    {error_log, [{file, "error.log"}]},
-                                    {screen_info_log, [{tty, short}]}
-                                ];
-                                formats -> [
-                                    {short, "%H:%Mi:%S.%Ms [%Priority] %Message\n"}
-                                ];
+        Get = fun (V) ->
+            ?INT_DBG("get_app_env: ~p~n", [V]),
+            application:get_env(chronica, V, default_env(V))
+        end,
 
-                                _ -> throw({not_found, V})
-                            end;
-                        Value -> Value
-                    end
-                catch
-                    _:_ -> throw({not_found, V})
-                end
-            end,
-
-    % for colored tty
-    ConfigColors = read_coloring(Get(colored)),
-    ConfigRules = read_rules(Get(rules), [], 1),
-    ConfigFlows = read_flows(Get(flows), []),
-    ConfigFormats = read_formats(Get(formats), []),
-    {NewConfigColors, NewConfigFlows, NewConfigFormats} =
-            case ConfigColors#chronica_coloring.colored of
-        false ->
-            {ConfigColors, ConfigFlows, ConfigFormats};
-        true ->
-            EndLineFormatsName = ConfigColors#chronica_coloring.end_line_formats_name,
-            WrapEndLineFormatsName = wrap_end_line_formats_name_colored(max_len_formats(ConfigFormats, 0), EndLineFormatsName),
-            NamesFormatColor = remove_duplicate(read_flows_tty(Get(flows), [], WrapEndLineFormatsName), []),
-            {
-                ConfigColors#chronica_coloring{formats_name = NamesFormatColor},
-                add_flows_color(ConfigFlows, [], WrapEndLineFormatsName),
-                add_formats_color(ConfigFormats, NamesFormatColor, [])
-            }
-    end,
+        % for colored tty
+        ConfigColors = read_coloring(Get(colored)),
+        ConfigRules = read_rules(Get(rules), [], 1),
+        ConfigFlows = read_flows(Get(flows), []),
+        ConfigFormats = read_formats(Get(formats), []),
+        {NewConfigColors, NewConfigFlows, NewConfigFormats} =
+        case ConfigColors#chronica_coloring.colored of
+            false ->
+                {ConfigColors, ConfigFlows, ConfigFormats};
+            true ->
+                EndLineFormatsName = ConfigColors#chronica_coloring.end_line_formats_name,
+                WrapEndLineFormatsName = wrap_end_line_formats_name_colored(max_len_formats(ConfigFormats, 0), EndLineFormatsName),
+                NamesFormatColor = remove_duplicate(read_flows_tty(Get(flows), [], WrapEndLineFormatsName), []),
+                {
+                    ConfigColors#chronica_coloring{formats_name = NamesFormatColor},
+                    add_flows_color(ConfigFlows, [], WrapEndLineFormatsName),
+                    add_formats_color(ConfigFormats, NamesFormatColor, [])
+                }
+        end,
 
         LogRootDir = get_log_root(Get(log_root), Now),
         DataRootDir = get_data_root(Get(data_root)),
 
-        ILParams =
-            case Get(internal_logger) of
-                ILP when is_list(ILP) ->
-                    lists:map(
-                        fun ({file, FName, ILSizes, ILFilter}) -> {file, LogRootDir ++ "/" ++ FName, ILSizes, ILFilter};
-                            (OP) -> OP
-                        end,
-                        ILP);
-                ILP -> throw({error, {bad_internal_logger, ILP}})
-            end,
+        ILParams = case Get(internal_logger) of
+            ILP when is_list(ILP) ->
+                lists:map(
+                    fun ({file, FName, ILSizes, ILFilter}) ->
+                        {file, LogRootDir ++ "/" ++ FName, ILSizes, ILFilter};
+                        (OP) -> OP
+                    end,
+                    ILP);
+            ILP -> throw({error, {bad_internal_logger, ILP}})
+        end,
 
-        ILParams2 =
-            case ILParams of
-                [file] ->
-                    io:format("Bad chronica config: Using old-style internal_logger params, update it!~n", []),
-                    [{tty, warning}, {file, LogRootDir ++ "/" ++ Get(internal_logger_filename), {Get(max_file_size), Get(max_file_num)}, warning}];
-                [debug] ->
-                    io:format("Bad chronica config: Using old-style internal_logger params, update it!~n", []),
-                    [{tty, debug}];
-                [file, debug] ->
-                    io:format("Bad chronica config: Using old-style internal_logger params, update it!~n", []),
-                    [{tty, debug}, {file, LogRootDir ++ "/" ++ Get(internal_logger_filename), {Get(max_file_size), Get(max_file_num)}, debug}];
-                [debug, file] ->
-                    io:format("Bad chronica config: Using old-style internal_logger params, update it!~n", []),
-                    [{tty, debug}, {file, LogRootDir ++ "/" ++ Get(internal_logger_filename), {Get(max_file_size), Get(max_file_num)}, debug}];
-                Other -> Other
-            end,
+        FileAttr = {Get(max_file_size), Get(max_file_num)},
+        ErrLog = fun() ->
+                    io:format("Bad chronica config: Using old-style "
+                            "internal_logger params, update it!~n", [])
+                    end,
+        ILParams2 = case ILParams of
+            [file] ->
+                FileFlow = LogRootDir ++ "/" ++ Get(internal_logger_filename),
+                ErrLog(),
+                [{tty, warning}, {FileFlow, FileAttr, warning}];
+            [debug] ->
+                ErrLog(),
+                [{tty, debug}];
+            [file, debug] ->
+                FileFlow = LogRootDir ++ "/" ++ Get(internal_logger_filename),
+                ErrLog(),
+                [{tty, debug}, {file, FileFlow, FileAttr, debug}];
+            [debug, file] ->
+                FileFlow = LogRootDir ++ "/" ++ Get(internal_logger_filename),
+                ErrLog(),
+                [{tty, debug}, {file, FileFlow, FileAttr, debug}];
+            Other -> Other
+        end,
 
         Config = #chronica_config{
-                        rules = ConfigRules,
-                        flows = NewConfigFlows,
-                        formats = NewConfigFormats,
-                        colors = NewConfigColors,
-                        active = Get('active'),
-                        detail_info = Get('detail_info'),
-                        rotate_at_start = Get(rotate_at_start),
-                        internal_logger = ILParams2,
-                        data_root = DataRootDir,
-                        log_root = LogRootDir,
-                        max_file_size = Get(max_file_size),
-                        max_file_num = Get(max_file_num),
-                        tty_enabled = Get(tty_enabled),
-                        tcp_port = Get(tcp_port),
-                        tcp_host = Get(tcp_host),
-                        backend_modules = Get(backend_modules)
-                    },
+                    rules = ConfigRules,
+                    flows = NewConfigFlows,
+                    formats = NewConfigFormats,
+                    colors = NewConfigColors,
+                    active = Get('active'),
+                    detail_info = Get('detail_info'),
+                    rotate_at_start = Get(rotate_at_start),
+                    internal_logger = ILParams2,
+                    data_root = DataRootDir,
+                    log_root = LogRootDir,
+                    max_file_size = Get(max_file_size),
+                    max_file_num = Get(max_file_num),
+                    tty_enabled = Get(tty_enabled),
+                    tcp_port = Get(tcp_port),
+                    tcp_host = Get(tcp_host),
+                    backend_modules = Get(backend_modules)
+                   },
         {ok, Config}
     catch
         throw:E -> {error, E};
@@ -1278,19 +1276,19 @@ parse_formats(BadFormated, _, _) ->
     erlang:throw({parse_formats, bad_format}).
 
 get_log_root(Str, Now) ->
-    {{Y, M, D},{H, Mi, S}} = calendar:now_to_local_time(Now),
-    Str1 = re:replace(Str,  "\\<Node\\>", atom_to_list(node()), [unicode, global, {return, list}]),
-    Str2 = re:replace(Str1, "\\<Year\\>", indented_str(4, Y), [unicode, global, {return, list}]),
-    Str3 = re:replace(Str2, "\\<Month\\>", indented_str(2, M), [unicode, global, {return, list}]),
-    Str4 = re:replace(Str3, "\\<Day\\>", indented_str(2, D), [unicode, global, {return, list}]),
-    Str5 = re:replace(Str4, "\\<Hour\\>", indented_str(2, H), [unicode, global, {return, list}]),
-    Str6 = re:replace(Str5, "\\<Minute\\>", indented_str(2, Mi), [unicode, global, {return, list}]),
-    Str7 = re:replace(Str6, "\\<Second\\>", indented_str(2, S), [unicode, global, {return, list}]),
-    Str7.
+    {{Y, M, D}, {H, Mi, S}} = calendar:now_to_local_time(Now),
+    ReOpts = [unicode, global, {return, list}],
+    Str1 = re:replace(Str,  "\\<Node\\>",   atom_to_list(node()), ReOpts),
+    Str2 = re:replace(Str1, "\\<Year\\>",   indented_str(4, Y),   ReOpts),
+    Str3 = re:replace(Str2, "\\<Month\\>",  indented_str(2, M),   ReOpts),
+    Str4 = re:replace(Str3, "\\<Day\\>",    indented_str(2, D),   ReOpts),
+    Str5 = re:replace(Str4, "\\<Hour\\>",   indented_str(2, H),   ReOpts),
+    Str6 = re:replace(Str5, "\\<Minute\\>", indented_str(2, Mi),  ReOpts),
+    re:replace(Str6, "\\<Second\\>", indented_str(2, S), ReOpts).
 
 get_data_root(Str) ->
-    Str1 = re:replace(Str, "\\<Node\\>", atom_to_list(node()), [unicode, global, {return, list}]),
-    Str1.
+    re:replace(Str, "\\<Node\\>", atom_to_list(node()),
+               [unicode, global, {return, list}]).
 
 indented_str(I, N) when is_integer(N) and is_integer(I) ->
     Str = integer_to_list(N),
@@ -1360,18 +1358,19 @@ add_application_in_cache(App, RApps, Rules, Cache, Detail_info, TickFun) ->
                 {ok, {[App | RApps], Cache}};
             % no cache or old cache
             _Cached ->
-                case Detail_info of
+                AppModulesCode = case Detail_info of
                     true ->
                         io:format("Compiling the cache: [~p] ", [App]),
                         T1 = get_timestamp(),
-                        AppModulesCode = generate_app_iface_modules(App, Rules),
+                        Apps = generate_app_iface_modules(App, Rules),
                         T2 = get_timestamp(),
-                        case AppModulesCode of
+                        case Apps of
                             [] -> io:format("skipped~n");
                             _ -> io:format("~pms done.~n", [T2 - T1])
-                        end;
+                        end,
+                        Apps;
                     false ->
-                        AppModulesCode = generate_app_iface_modules(App, Rules)
+                        generate_app_iface_modules(App, Rules)
                 end,
                 load_app_iface_modules(AppModulesCode),
                 ?INT_DBG("Registered \\ ~p~n", [[App | RApps]]),
@@ -1386,7 +1385,7 @@ add_application_in_cache(App, RApps, Rules, Cache, Detail_info, TickFun) ->
 -spec get_timestamp() -> integer().
 get_timestamp() ->
     {Mega, Sec, Micro} = os:timestamp(),
-    (Mega*1000000 + Sec)*1000 + round(Micro/1000).
+    (Mega * 1000000 + Sec) * 1000 + round(Micro / 1000).
 %%++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 generate_app_iface_modules(App, Rules) ->

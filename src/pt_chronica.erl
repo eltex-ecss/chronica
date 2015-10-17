@@ -289,24 +289,35 @@ search_stacktrace(_, _) ->
 
 parse_str_debug(Str) ->
     ToAST = fun (Str1) ->
-                Line = 0,
-                case erl_scan:string(Str1, Line) of
-                    {ok, Tokens, _} ->
-                        case erl_parse:parse_form(Tokens) of
-                            {ok, Abs} -> {ok, [Abs]};
-                            {error, ParseFormError} ->
-                                case erl_parse:parse_exprs(Tokens) of
-                                    {ok, List} -> {ok, List};
-                                    {error, ParseExprsError} ->
-                                        ?PATROL_ERROR("Error when parsing string  \"~s\"~nparse_form: ~s~nparse_exprs: ~s", [Str1, pt_supp:format_errors(ParseFormError), pt_supp:format_errors(ParseExprsError)]), {error, ParseExprsError}
-                                end
-                        end;
-                    {error, ScanErrorInfo, _ScanEndLocation} ->
-                        ?PATROL_ERROR("Error when parsing string \"~s\":~n ~s", [Str1, pt_supp:format_errors(ScanErrorInfo)]), {error, ScanErrorInfo}
-                end
-            end,
+        Line = 0,
+        case erl_scan:string(Str1, Line) of
+            {ok, Tokens, _} ->
+                case erl_parse:parse_form(Tokens) of
+                    {ok, Abs} -> {ok, [Abs]};
+                    {error, ParseFormError} ->
+                        case erl_parse:parse_exprs(Tokens) of
+                            {ok, List} -> {ok, List};
+                            {error, ParseExprsError} ->
+                                ?PATROL_ERROR("Error when parsing string  "
+                                              "\"~s\"~nparse_form: ~s~n"
+                                              "parse_exprs: ~s",
+                                [Str1,
+                                 pt_supp:format_errors(ParseFormError),
+                                 pt_supp:format_errors(ParseExprsError)]),
+                                {error, ParseExprsError}
+                        end
+                end;
+            {error, ScanErrorInfo, _ScanEndLocation} ->
+                ?PATROL_ERROR("Error when parsing string \"~s\":~n ~s",
+                              [Str1, pt_supp:format_errors(ScanErrorInfo)]),
+                {error, ScanErrorInfo}
+        end
+    end,
     {ok, A} = ToAST(Str),
-    AST = parse_transform([ {attribute, 0, file, {"test.erl", 0}},{attribute, 0, module, mod} | A], []),
+    AST = parse_transform([
+                           {attribute, 0, file, {"test.erl", 0}},
+                           {attribute, 0, module, mod} | A
+                          ], []),
     ResAST = case lists:keytake(module, 3, AST) of
                 {value, _, R} -> R;
                 false -> false
@@ -421,7 +432,7 @@ format_error({app_no_start, Module}) ->
 format_error({list_forget_var, Args}) ->
     io_lib:format("Args parameter should be list: ~p, (use _ to skip error)", [Args]);
 format_error({invalid_args, Str, Args}) ->
-    NewStr = lists:reverse(lists:foldl(fun ($~, Acc) -> [$~,$~|Acc];
+    NewStr = lists:reverse(lists:foldl(fun ($~, Acc) -> [$~, $~|Acc];
                                            (C, Acc)  -> [C|Acc]
                                        end, "", Str)),
     io_lib:format("Invalid args. Format must be string. Args must be list of terms. Format: ~s, Args: ~s", [NewStr, Args]);
@@ -430,7 +441,7 @@ format_error({invalid_args_length, InvalidLength}) ->
 format_error({list_forget, Args}) ->
     io_lib:format("Args parameter should be list: ~p", [Args]);
 format_error({bad_log_param, Format}) ->
-    EscapedFormat = lists:reverse(lists:foldl(fun ($~, Acc) -> [$~,$~|Acc];
+    EscapedFormat = lists:reverse(lists:foldl(fun ($~, Acc) -> [$~, $~|Acc];
                                                   (C, Acc)  -> [C|Acc]
                                               end, "", Format)),
      io_lib:format("Bad log parameter: ~p~n", [EscapedFormat]);

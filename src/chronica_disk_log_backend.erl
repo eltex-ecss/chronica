@@ -41,7 +41,7 @@ handle_open(Filename, Options) ->
             true ->
                 CheckedName = check_filename(Filename, LogRoot),
                 LogName = erlang:list_to_atom("chronica_disk_log_backend_" ++ Filename),
-                case lists:member(LogName, element(1,disk_log:accessible_logs())) of
+                case lists:member(LogName, element(1, disk_log:accessible_logs())) of
                     false ->
                         Res = case disk_log:open([
                                             {name, LogName},

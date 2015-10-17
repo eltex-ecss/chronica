@@ -53,7 +53,9 @@
     write_cache/2
    ]).
 
--compile({inline,[{scan_f2,7}]}).
+-compile({inline, [
+                   {scan_f2, 7}
+                  ]}).
 
 -import(lists, [concat/1, reverse/1, sum/1]).
 
@@ -341,7 +343,7 @@ int_open(FName, Repair, read_write, Head) ->
                 {ok, Fd2} ->
                     mark(Fd2, FName, ?OPENED),
                                     FdC1 = #cache{fd = Fd2},
-                    {FdC, P} = position_close(FdC1, FName,eof),
+                    {FdC, P} = position_close(FdC1, FName, eof),
                     {ok, {existed, FdC, {0, 0}, P}};
                 Error ->
                     file_error(FName, Error)
@@ -487,14 +489,14 @@ lh({M, F, A}, Format) when is_list(A) ->
     {ok, Bytes} ->
         case catch list_to_binary(Bytes) of
         {'EXIT', _} ->
-            {error, {invalid_header, {{M,F,A}, {ok, Bytes}}}};
+            {error, {invalid_header, {{M, F, A}, {ok, Bytes}}}};
         Bin ->
             {ok, Bin}
         end;
     {'EXIT', Error} ->
-        {error, {invalid_header, {{M,F,A}, Error}}};
+        {error, {invalid_header, {{M, F, A}, Error}}};
     Error ->
-        {error, {invalid_header, {{M,F,A}, Error}}}
+        {error, {invalid_header, {{M, F, A}, Error}}}
     end;
 lh({M, F, A}, _Format) -> % cannot happen
     {error, {invalid_header, {M, F, A}}};
@@ -520,7 +522,7 @@ scan_f_read(B, In, Out, File, FSz, Tmp, MaxBytes, No, Bad) ->
                 scan_f(NewBin, FSz, [], No, Bad),
             case log(Out, Tmp, lists:reverse(Ack)) of
                 {ok, _Size, NewOut} ->
-                    scan_f_read(NB, In, NewOut, File, FSz, Tmp, NMax,NNo,NBad);
+                    scan_f_read(NB, In, NewOut, File, FSz, Tmp, NMax, NNo, NBad);
                 {{error, {file_error, _Filename, Error}}, NewOut} ->
                     repair_err(In, NewOut, Tmp, File, {error, Error})
             end;
@@ -807,7 +809,7 @@ mf_int_chunk_read_only(Handle, {FileNo, Pos}, Bin, N) ->
         case do_chunk_read_only(FdC, FName, Pos, Bin, N) of
         {NewFdC, eof} ->
             file:close(NewFdC#cache.fd),
-            mf_int_chunk_read_only(Handle, {NFileNo,0}, [], N);
+            mf_int_chunk_read_only(Handle, {NFileNo, 0}, [], N);
         {NewFdC, Other} ->
             file:close(NewFdC#cache.fd),
             {Handle, conv(Other, FileNo)}
@@ -1089,7 +1091,7 @@ ext_file_open(FName, NewFile, OldFile, OldCnt, Head) ->
     ext_file_open(FName, NewFile, OldFile, OldCnt, Head, Repair, Mode).
 
 ext_file_open(FName, NewFile, OldFile, OldCnt, Head, Repair, Mode) ->
-    FileName = FName,%add_ext(FName, NewFile),
+    FileName = FName,
     {ok, {_Alloc, FdC, HeadSize, FileSize}} =
         ext_open(FileName, Repair, Mode, Head),
     Lost = write_index_file(Mode, FName, NewFile, OldFile, OldCnt),
@@ -1187,29 +1189,29 @@ write_index_file(read_write, FName, NewFile, OldFile, OldCnt) ->
         {Offset, SzSz} =
         case file:read(Fd, 6) of
             eof ->
-            Bin = <<0, 0:32, ?VERSION, NewFile:32>>,
-            fwrite_close2(Fd, FileName, Bin),
-            {10, 8};
-            {ok, <<0, 0:32, _Version>>} ->
-            pwrite_close2(Fd, FileName, 6, <<NewFile:32>>),
-            {10, 8};
-            {ok, <<0, _/binary>>} ->
-            pwrite_close2(Fd, FileName, 1, <<NewFile:32>>),
-            {5, 4};
-            {ok, <<_,_/binary>>} ->
-                        %% Very old format, convert to the latest format!
-            case file:read_file(FileName) of
-                {ok, <<_CurF, Tail/binary>>} ->
-                position_close2(Fd, FileName, bof),
                 Bin = <<0, 0:32, ?VERSION, NewFile:32>>,
-                NewTail = to_8_bytes(Tail, [], FileName, Fd),
-                fwrite_close2(Fd, FileName, [Bin | NewTail]),
+                fwrite_close2(Fd, FileName, Bin),
                 {10, 8};
-                Error ->
-                file_error_close(Fd, FileName, Error)
-            end;
+            {ok, <<0, 0:32, _Version>>} ->
+                pwrite_close2(Fd, FileName, 6, <<NewFile:32>>),
+                {10, 8};
+            {ok, <<0, _/binary>>} ->
+                pwrite_close2(Fd, FileName, 1, <<NewFile:32>>),
+                {5, 4};
+            {ok, <<_, _/binary>>} ->
+                %% Very old format, convert to the latest format!
+                case file:read_file(FileName) of
+                    {ok, <<_CurF, Tail/binary>>} ->
+                        position_close2(Fd, FileName, bof),
+                        Bin = <<0, 0:32, ?VERSION, NewFile:32>>,
+                        NewTail = to_8_bytes(Tail, [], FileName, Fd),
+                        fwrite_close2(Fd, FileName, [Bin | NewTail]),
+                        {10, 8};
+                    Error ->
+                        file_error_close(Fd, FileName, Error)
+                end;
             Error ->
-            file_error_close(Fd, FileName, Error)
+                file_error_close(Fd, FileName, Error)
         end,
 
         NewPos = Offset + (NewFile - 1)*SzSz,
@@ -1236,7 +1238,7 @@ write_index_file(read_write, FName, NewFile, OldFile, OldCnt) ->
         file_error(FileName, E)
     end.
 
-to_8_bytes(<<N:32,T/binary>>, NT, FileName, Fd) ->
+to_8_bytes(<<N:32, T/binary>>, NT, FileName, Fd) ->
     to_8_bytes(T, [NT | <<N:64>>], FileName, Fd);
 to_8_bytes(B, NT, _FileName, _Fd) when byte_size(B) =:= 0 ->
     NT;
@@ -1335,7 +1337,7 @@ write_size_file(read_write, FName, NewSize, NewMaxFiles, Version) ->
 
 %% -> {NoBytes, NoFiles}.
 read_size_file(FName) ->
-    {Size,_Version} = read_size_file_version(FName),
+    {Size, _Version} = read_size_file_version(FName),
     Size.
 
 %% -> {{NoBytes, NoFiles}, Version}, Version = integer() | undefined
@@ -1495,7 +1497,7 @@ remove_files(FName, N, Max, Reply) ->
 %% -> {MaxBytes, MaxFiles}
 get_wrap_size(#handle{maxB = MaxB, maxF = MaxF}) ->
     case MaxF of
-    {NewMaxF,_} -> {MaxB, NewMaxF};
+    {NewMaxF, _} -> {MaxB, NewMaxF};
     MaxF        -> {MaxB, MaxF}
     end.
 
@@ -1655,12 +1657,12 @@ write_cache_close(Fd, FileName, C) ->
         Error -> file_error_close(Fd, FileName, Error)
     end.
 
--spec file_error(string(), {'error',atom()}) -> no_return().
+-spec file_error(string(), {error, atom()}) -> no_return().
 
 file_error(FileName, {error, Error}) ->
     throw({error, {file_error, FileName, Error}}).
 
--spec file_error_close(fd(), string(), {'error',atom()}) -> no_return().
+-spec file_error_close(fd(), string(), {error, atom()}) -> no_return().
 
 file_error_close(Fd, FileName, {error, Error}) ->
     file:close(Fd),
