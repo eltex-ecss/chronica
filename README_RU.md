@@ -206,9 +206,6 @@ applications, на ряду с kernel и stdlib).
 Отсюда следует, что если к примеру мы попытаемся использовать вызов вида log:Level в модуле, который 
 запущен до Chronica, то такой вызов не приведет к ожидаемому результату.
 
-##Планы
-Теги константные<br>
-Регистрация модулей<br>
 <p align="center">
 <img src="https://github.com/eltex-ecss/chronica/blob/master/doc/logo_eltex.jpg"/>
 </p>
