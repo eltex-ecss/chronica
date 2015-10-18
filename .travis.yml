@@ -1,0 +1,7 @@
+language: erlang
+otp_release:
+    - R16B03-1
+    - 17.5
+    - 18.0
+notifications:
+  email: false
