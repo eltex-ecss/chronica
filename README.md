@@ -188,12 +188,15 @@ If you want define custom formatter:
 ###For update Chronica configuration in runtime usages:
 
 * chronica_manager:active(false | true)
+
 Toggle chronica
 
 * chronica_manager:update_rule_inwork(name_rule, false | true)
+
 Toggle "name_rule" rule on the fly.
 
 * chronica_manager:add_application(App)
+
 Add new application in list logging application
 
 <p align="center">
