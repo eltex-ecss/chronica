@@ -8,34 +8,34 @@ Chronica is a framework for logging messages for Erlang OTP Applications.
 
 ##Features
 * [Faster, lightweight, more flexible!](https://docs.google.com/document/d/1S4-Yf799d5SDCWhr78Fsm6-EY98gd1BRW-Qffaynzsc/edit?usp=sharing)
-* Support to create multiple flow for output (file, tty, network), rules and
-    output format
-* Support to define the format for each multiple backangs
-* Support to remote split for flow logs (filtered through rules)
-* Different filtered mode for logs
-* Very easy migration from lager
-* Low overhead on unused logs (deleted unused calls for log level on fly)
-* Flexible configuration
+* Pinning log flows to different outputs (file, tty, network)
+* Custom rules (as regexp) and text formatting for output are supported.
+* Possibility to define text formatting separately for each backend
+* Tools for remote connection allows you to set rule and get back log flow
+    filtered by that rule (grablog)
+* Easy migration from lager
+* Logging functions which are unused because of current verbose level causes
+    no overhead (deleting unused calls for log level on-the-fly)
 * Write on disk in two modes: text and binary
 * Custom backends for output logs
-* Support unicode
+* Supports unicode
 * Log rotate
-* Coloring
-* Change log level in runtime
-* Support custom tags for easy filtered logs
-* Cashed inner structure
+* Colored output to terminal
+* Change log level and rules in runtime
+* Custom tags for easy filtered logs
 
-## Usages
-Add to you project as Erlang dependency (app file) and add compile options:
+##Usages
+In order to add Chronica into your application you will need to add it as Erlang
+dependency in app file and also set compiler options:
 ```erlang
 {parse_transform, pt_chronica}
 ```
-Or add include file in current module:
+Or add include file in each module if it uses Chronica:
 ```erlang
 -include_lib("chronica/include/chronica.hrl").
 ```
 
-Supports log levels:
+## Supported log levels:
 ```
 (MAX) debug -> trace -> info -> warning -> (MIN) error
 ```
@@ -68,7 +68,7 @@ and replace on
 log:info("My stacktrace: %stack", [])
 ```
 
-## Todo:
+##log:todo:
 Applies developers instead unused variable:
 ```erlang
     garbage() ->
@@ -103,7 +103,7 @@ Add default section to sys.config:
     MaxFileNum,
     LogIfacePath
    ]}
-````
+```
 
 [Example](https://github.com/eltex-ecss/chronica/blob/master/samples/sys.config)
 
