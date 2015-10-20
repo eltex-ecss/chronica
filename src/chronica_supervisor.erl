@@ -56,17 +56,21 @@ init(ParamList) ->
 
                 ErrorBuffer = {chronica_error_buffer, {cycled_events, start_link, [chronica_error_buffer, ?MAX_ERROR_BUFFER_LEN]}, temporary, 1000, worker, []},
 
-                TCPServer =
-                    case TCPPort of
+                TCPServer = case TCPPort of
                         undefined -> [];
-                        _ -> [{chronica_tcp_server, {chronica_tcp_server, start_link, [TCPHost, TCPPort]}, permanent, 2000, worker, []}]
+                        _ ->
+                            [
+                             {chronica_tcp_server,
+                              {chronica_tcp_server, start_link,
+                               [TCPHost, TCPPort]}, permanent, 2000, worker, []
+                             }
+                            ]
                     end,
-                {ok,{{one_for_one,1,1},
+                {ok, {{one_for_one, 1, 1},
                      [
                       ErrorBuffer,
                       LogConfigurator
-                     ]
-                     ++ TCPServer
+                     ] ++ TCPServer
                     }};
             Err ->
                 io:format("Log Sever internal logger start failed cause: ~p~n", [Err]),

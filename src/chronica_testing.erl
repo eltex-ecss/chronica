@@ -61,15 +61,26 @@ do_format_test(N) ->
                 {defaultf, [{sfdile, "./"}]}
            ]
          },
-    S1 = "sdajhflkj asdh fasdhf kjghdasf kjdhgasf k agdsh fhdsgaf hasdg fkjdhasgf kjagsf dfsjg;kl sdlifgydl",
+    S1 = "sdajhflkj asdh fasdhf kjghdasf kjdhgasf k agdsh fhdsgaf hasdg "
+         "fkjdhasgf kjagsf dfsjg;kl sdlifgydl",
     X = fun () ->
-            io_lib:format("sakjdf hjhgdsjhgdshghg sdkh gdksjfh ~p sfkjhdkjfhgdshg ~s dsf.lkjdkjfhgkdjfhgdhfg ~n fdkljlkjgsdfj g fgd  ~n ldkfjglkdfs g  ~p", [P1, S1, P2])
+            io_lib:format("sakjdf hjhgdsjhgdshghg sdkh gdksjfh ~p "
+                          "sfkjhdkjfhgdshg ~s dsf.lkjdkjfhgkdjfhgdhfg ~n "
+                          "fdkljlkjgsdfj g fgd  ~n ldkfjglkdfs g  ~p", [P1, S1, P2])
         end,
     Y = fun () ->
-            io_lib:format("sakjdf hjhgdsjhgdshghg sdkh gdksjfh ~w sfkjhdkjfhgdshg ~s dsf.lkjdkjfhgkdjfhgdhfg ~n fdkljlkjgsdfj g fgd  ~n ldkfjglkdfs g  ~w", [P1, S1, P2])
+            io_lib:format("sakjdf hjhgdsjhgdshghg sdkh gdksjfh ~w "
+                          "sfkjhdkjfhgdshg ~s dsf.lkjdkjfhgkdjfhgdhfg ~n "
+                          "fdkljlkjgsdfj g fgd  ~n ldkfjglkdfs g  ~w", [P1, S1, P2])
         end,
     Z = fun () ->
-            ["sakjdf hjhgdsjhgdshghg sdkh gdksjfh ", io_lib_pretty:print(P1) ," sfkjhdkjfhgdshg ", S1, " dsf.lkjdkjfhgkdjfhgdhfg ~n fdkljlkjgsdfj g fgd  ~n ldkfjglkdfs g ", io_lib_pretty:print(P2)]
+            [
+             "sakjdf hjhgdsjhgdshghg sdkh gdksjfh ",
+             io_lib_pretty:print(P1),
+             " sfkjhdkjfhgdshg ", S1,
+             " dsf.lkjdkjfhgkdjfhgdhfg ~n fdkljlkjgsdfj g fgd  ~n "
+             "ldkfjglkdfs g ", io_lib_pretty:print(P2)
+            ]
         end,
     time(fun() -> do(N, X) end),
     time(fun() -> do(N, Y) end),
@@ -163,11 +174,11 @@ test_funtrace(aaa,  A = #test_record{a = C} = _S) ->
 test_funtrace(aaa,  _S = {asdas, _, _, _, {dffgs, _, [B | _]}}) ->
     B;
 test_funtrace(aaa,  {asdas, _, _, _, {dffg, _, [B, C, _]}}) ->
-    {B,C};
+    {B, C};
 test_funtrace(aaa,  A = #test_record2{}) ->
     A;
 test_funtrace(aaa, {A = {C, _}, a} = State) ->
-    {A,C, State}.
+    {A, C, State}.
 
 profiling_test(N) ->
     MyPid = self(),
@@ -199,6 +210,17 @@ bombing_proc(N, From) ->
 bombing(0) -> ok;
 bombing(N) ->
     P = self(),
-    io_lib:format("~p ~p sfdgdsfjgsdf g~p sfjdskjh gsd~p", [{asfdkjh, dfjhgd}, sdjkfsjkdhf, sadkjfhaskjf, [sdfgdsfgdsfg,dfgsdfgsd,gsdfgdsgsd,gsdfgsdfgsdfg,dsfgsdfgdsgdsfgsdfg,df]]),
+    io_lib:format("~p ~p sfdgdsfjgsdf g~p sfjdskjh gsd~p",
+                  [{asfdkjh, dfjhgd},
+                   sdjkfsjkdhf,
+                   sadkjfhaskjf,
+                   [
+                    sdfgdsfgdsfg,
+                    dfgsdfgsd,
+                    gsdfgdsgsd,
+                    gsdfgsdfgsdfg,
+                    dsfgsdfgdsgdsfgsdfg,
+                    df
+                   ]]),
     log:debug(?MODULE, "bombing from ~p", [P]),
     bombing(N - 1).

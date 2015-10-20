@@ -42,17 +42,17 @@ exception_format({application_start_failure, App, Reason}) ->
 exception_format(Reason) -> Reason.
 
 exception_app_format(kernel, {{shutdown,
-    {failed_to_start_child,net_sup, {shutdown,
-        {failed_to_start_child,net_kernel, {'EXIT',nodistribution}}}}},
-                              {kernel,start,[normal,[]]}}) ->
+    {failed_to_start_child, net_sup, {shutdown,
+        {failed_to_start_child, net_kernel, {'EXIT', nodistribution}}}}},
+                              {kernel, start, [normal, []]}}) ->
     throw(not_logged_it);
 exception_app_format(chronica, {{bad_return, {chronica_supervisor, init, Reason}}, _Stack}) ->
     exception_chronica_format(Reason);
 exception_app_format(AppName, {{shutdown, {failed_to_start_child, chronica_manager,
-        {error,{parse_flow, bad_format_type}}}}, _Stack}) ->
+        {error, {parse_flow, bad_format_type}}}}, _Stack}) ->
     io_lib:format("application ~p can't start cause one of the flows has invalid flow format.", [AppName]);
 exception_app_format(AppName, {{shutdown, {failed_to_start_child, chronica_manager,
-        {error,{parse_flow, cant_open_output}}}}, _Stack}) ->
+        {error, {parse_flow, cant_open_output}}}}, _Stack}) ->
     io_lib:format("application ~p can't start cause one of the flows can't "
                   "open output stream (file, tty, tcp, etc.)", [AppName]);
 exception_app_format(AppName, Error) ->

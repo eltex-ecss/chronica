@@ -41,7 +41,7 @@ handle_open(Filename, Options) ->
             true ->
                 CheckedName = check_filename(Filename, LogRoot),
                 LogName = erlang:list_to_atom("chronica_disk_log_backend_" ++ Filename),
-                case lists:member(LogName, element(1,disk_log:accessible_logs())) of
+                case lists:member(LogName, element(1, disk_log:accessible_logs())) of
                     false ->
                         Res = case disk_log:open([
                                             {name, LogName},
@@ -226,7 +226,11 @@ get_application_build_info(AppName) ->
             Module -> Module:build_info()
         end
     catch
-        _:_E -> [{error, lists:flatten(io_lib:format("can't get build info for application ~p cause ~p", [AppName, _E]))}]
+        _:Error -> [{error,
+                  lists:flatten(
+                    io_lib:format("can't get build info for application ~p cause ~p",
+                                  [AppName, Error]))
+                 }]
     end.
 
 find_latest_build_info([], Res) -> Res;

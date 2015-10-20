@@ -99,15 +99,15 @@ log_error(Time, F, A, Module, Func, Line) -> log(?PE, Time, F, A, Module, Func, 
 
 -spec log_warning(Time::term(), string(), [any()], atom(), string(), integer()) -> ok.
 
-log_warning(Time, F,A, Module, Func, Line) -> log(?PW, Time, F, A, Module, Func, Line).
+log_warning(Time, F, A, Module, Func, Line) -> log(?PW, Time, F, A, Module, Func, Line).
 
 -spec log_info(Time::term(), string(), [any()], atom(), string(), integer()) -> ok.
 
-log_info(Time, F,A, Module, Func, Line) -> log(?PI, Time, F, A, Module, Func, Line).
+log_info(Time, F, A, Module, Func, Line) -> log(?PI, Time, F, A, Module, Func, Line).
 
 -spec log_debug(Time::term(), string(), [any()], atom(), string(), integer()) -> ok.
 
-log_debug(Time, F,A, Module, Func, Line) -> log(?PD, Time, F, A, Module, Func, Line).
+log_debug(Time, F, A, Module, Func, Line) -> log(?PD, Time, F, A, Module, Func, Line).
 
 
 open_file(Filename, Sizes = {S, N})
@@ -156,13 +156,21 @@ open_file(Fn, Sz) ->
     throw({open_file_bad_params, {Fn, Sz}}).
 
 format(?PE, {{Y, M, D}, {H, Mi, S}}, F, A, Module, Func, Line) ->
-    io_lib:format("~2.10.0B.~2.10.0B.~4.10.0B ~2.10.0B:~2.10.0B:~2.10.0B ~p:~p: log *ERROR* (~s) " ++ F ++ "~n", [D,M,Y,H,Mi,S, Module, Line, Func] ++ A);
+    io_lib:format("~2.10.0B.~2.10.0B.~4.10.0B ~2.10.0B:~2.10.0B:~2.10.0B "
+                  "~p:~p: log *ERROR* (~s) " ++ F ++ "~n",
+                  [D, M, Y, H, Mi, S, Module, Line, Func] ++ A);
 format(?PW, {{Y, M, D}, {H, Mi, S}}, F, A, Module, Func, Line) ->
-    io_lib:format("~2.10.0B.~2.10.0B.~4.10.0B ~2.10.0B:~2.10.0B:~2.10.0B ~p:~p: log WARNING (~s) " ++ F ++ "~n", [D,M,Y,H,Mi,S,Module, Line, Func] ++ A);
+    io_lib:format("~2.10.0B.~2.10.0B.~4.10.0B ~2.10.0B:~2.10.0B:~2.10.0B "
+                  "~p:~p: log WARNING (~s) " ++ F ++ "~n",
+                  [D, M, Y, H, Mi, S, Module, Line, Func] ++ A);
 format(?PI, {{Y, M, D}, {H, Mi, S}}, F, A, Module, _Func, Line) ->
-    io_lib:format("~2.10.0B.~2.10.0B.~4.10.0B ~2.10.0B:~2.10.0B:~2.10.0B ~p:~p: log info: " ++ F ++ "~n", [D,M,Y,H,Mi,S,Module, Line] ++ A);
+    io_lib:format("~2.10.0B.~2.10.0B.~4.10.0B ~2.10.0B:~2.10.0B:~2.10.0B "
+                  "~p:~p: log info: " ++ F ++ "~n",
+                  [D, M, Y, H, Mi, S, Module, Line] ++ A);
 format(?PD, {{Y, M, D}, {H, Mi, S}}, F, A, Module, Func, Line) ->
-    io_lib:format("~2.10.0B.~2.10.0B.~4.10.0B ~2.10.0B:~2.10.0B:~2.10.0B ~p:~p: log debug (~s) " ++ F ++ "~n", [D,M,Y,H,Mi,S,Module, Line, Func] ++ A).
+    io_lib:format("~2.10.0B.~2.10.0B.~4.10.0B ~2.10.0B:~2.10.0B:~2.10.0B "
+                  "~p:~p: log debug (~s) " ++ F ++ "~n",
+                  [D, M, Y, H, Mi, S, Module, Line, Func] ++ A).
 
 get_p_num(debug) -> ?PD;
 get_p_num(info) -> ?PI;

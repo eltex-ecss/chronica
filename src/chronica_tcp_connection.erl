@@ -14,23 +14,22 @@
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
 %% API
--export([start_link/2,start/2, write/2, close/2]).
+-export([start_link/2, start/2, write/2, close/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--record(s,
-        {
-            state = accept :: accept | waiting_settings | sending_data,
-            listen_socket,
-            man_mon,
-            manager,
-            socket,
-            name,
-            mask,
-            assembling_buff = []
-        }).
+-record(s, {
+          state = accept :: accept | waiting_settings | sending_data,
+          listen_socket,
+          man_mon,
+          manager,
+          socket,
+          name,
+          mask,
+          assembling_buff = []
+         }).
 
 -define(reaccept_timeout, 5000).
 

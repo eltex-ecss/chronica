@@ -20,7 +20,7 @@
 -include_lib("pt_scripts/include/pt_recompilable.hrl").
 -include("../include/chronica_int.hrl").
 
-default({{{Year,Month,Day},{Hour,Minute,Second},Millisecond},
+default({{{Year, Month, Day}, {Hour, Minute, Second}, Millisecond},
          PriorityInt, Module, Pid, Line, _File, Function, UserStr}) ->
     Get_priority_prefix_up = fun(Priority) ->
         case Priority of

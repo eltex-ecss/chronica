@@ -130,7 +130,7 @@ get_list_of_fun(AST, CompileOptions, Opt) ->
     lists:usort(lists:foldl(
         fun (S, Acc) ->
                 case S of
-                    {Opt ,all} -> add_all(AST, Acc);
+                    {Opt, all} -> add_all(AST, Acc);
                     {Opt, exported} -> add_exported(AST, Acc);
                     {Opt, ListOfFun} when is_list(ListOfFun) -> ListOfFun ++ Acc;
                     {Opt, BadParam} -> throw(?mk_parse_error(0, {bad_param, BadParam}));
@@ -230,7 +230,7 @@ process_fun_trace_arg2({OldFormat, OldFormatArg}, ast_pattern("$A = $B."), N, Li
     process_fun_trace_arg2({Format ++ " = ", FormatArg}, B, N, Line);
 process_fun_trace_arg2({OldFormat, OldFormatArg}, ast_pattern("[$A | $B]."), N, Line) when pt_lib:is_variable(B) ->
     {Format,  FormatArg}  = process_fun_trace_arg2({OldFormat ++ "[", OldFormatArg}, A, N, Line),
-    {Format2, FormatArg2} = process_fun_trace_arg2({Format++" | ", FormatArg}, B, N, Line),
+    {Format2, FormatArg2} = process_fun_trace_arg2({Format ++ " | ", FormatArg}, B, N, Line),
     {Format2 ++ "]", FormatArg2};
 process_fun_trace_arg2({OldFormat, OldFormatArg}, ast_pattern("[$_A | $_B].") = P, N, Line) ->
     {Format, FormatArg} = process_list_element({OldFormat ++ "[", OldFormatArg}, P, N, Line, true),

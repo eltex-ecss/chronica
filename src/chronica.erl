@@ -39,8 +39,8 @@ register() ->
 -spec register(atom()) -> ok | {error, term()}.
 
 register(App) ->
-	true = chronica_status:configured(),
-	chronica_manager:add_application(App).
+    true = chronica_status:configured(),
+    chronica_manager:add_application(App).
 
 activate() ->
     try

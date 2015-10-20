@@ -41,7 +41,8 @@ handle_open({StrIP, Port}, _) ->
             {ok, Socket} ->
                 case start_link({Socket, StrIP, Port}) of
                     {ok, Name} ->
-                        handle_write(Name, io_lib:format("Open UDP log from ~p log to ~p:~p~n", [node(),StrIP,Port]), default),
+                        OpenMsg = io_lib:format("Open UDP log from ~p log to ~p:~p~n", [node(), StrIP, Port]),
+                        handle_write(Name, OpenMsg, default),
                         {ok, Name};
                     {error, Reason} ->
                         ?INT_ERR("Error open udp socket(~p:~p) cause cant start gen_server: ~p", [StrIP, Port, Reason]),

@@ -140,7 +140,7 @@ handle_call({open, Output, Param, Options}, _From, State = #s{closing_flows = Cl
             Error -> {reply, Error, State}
         end
     catch
-        _:E -> {reply, {error, {E,erlang:get_stacktrace()}}, State}
+        _:E -> {reply, {error, {E, erlang:get_stacktrace()}}, State}
     end;
 
 handle_call({close, Output, Handle, Timeout}, _From, State = #s{files = Files}) when Timeout =< 0 ->
@@ -148,14 +148,14 @@ handle_call({close, Output, Handle, Timeout}, _From, State = #s{files = Files}) 
         ?INT_DBG("Closing output: ~100000p/~100000p~n", [Output, Handle]),
         {reply, Output:handle_close(Handle), State#s{files = sets:del_element({Output, Handle}, Files)}}
     catch
-        _:E -> {reply, {error, {E,erlang:get_stacktrace()}}, State}
+        _:E -> {reply, {error, {E, erlang:get_stacktrace()}}, State}
     end;
 handle_call({close, Output, Handle, Timeout}, _From, State = #s{closing_flows = ClosingFlows}) when Timeout > 0 ->
     try
         erlang:start_timer(Timeout, self(), {close_timeout, Output, Handle}),
         {reply, ok, State#s{closing_flows = [{Output, Handle}|ClosingFlows]}}
     catch
-        _:E -> {reply, {error, {E,erlang:get_stacktrace()}}, State}
+        _:E -> {reply, {error, {E, erlang:get_stacktrace()}}, State}
     end;
 
 handle_call(_Msg, _From, State) ->
@@ -218,7 +218,7 @@ handle_info({disk_log, _Node, _Log, {error_status, {error, {file_error, _, enosp
 handle_info({disk_log, _Node, _Log, {error_status, {error, enospc}}}, State) ->
     handle_no_spc(State);
 
-handle_info({'EXIT', _,normal}, State) ->
+handle_info({'EXIT', _, normal}, State) ->
     {noreply, State};
 
 handle_info(_Info, State) ->

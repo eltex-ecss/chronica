@@ -64,13 +64,13 @@ write_report({warning_report, _GL, {Pid, Type, Report}}) ->
 
 write_report({error, _GL, {_Pid, Format, Args}}) ->
     Head = write_head(error_report, _Pid),
-    io_lib:format(Head ++ Format,Args);
+    io_lib:format(Head ++ Format, Args);
 
 write_report({info_msg, _GL, {_Pid, Format, Args}}) ->
-    io_lib:format(Format,Args);
+    io_lib:format(Format, Args);
 
 write_report({warning_msg, _GL, {_Pid, Format, Args}}) ->
-    io_lib:format(Format,Args);
+    io_lib:format(Format, Args);
 
 write_report(Event) ->
     io_lib:format("Bad formated error_logger event ~p", [Event]).
@@ -104,7 +104,7 @@ write_report2(Head, supervisor_report, Report) ->
     Offender = sup_get(offender, Report),
     io_lib:format(Head ++ "     Supervisor: ~p~n     Context:    ~p~n"
                   "     Reason:     ~80.18p~n     Offender:   ~80.18p~n~n",
-          [Name,Context,Reason,Offender]);
+          [Name, Context, Reason, Offender]);
 write_report2(Head, progress, Report) ->
     Format = format_key_val(Report),
     io_lib:format(Head ++ "~s", [Format]);
@@ -142,9 +142,9 @@ sup_get(Tag, Report) ->
             ""
     end.
 
-format_key_val([{Tag,Data}]) ->
+format_key_val([{Tag, Data}]) ->
     io_lib:format("    ~16w: ~p",[Tag,Data]) ++ format_key_val([]);
-format_key_val([{Tag,Data}|Rep]) ->
+format_key_val([{Tag, Data}|Rep]) ->
     io_lib:format("    ~16w: ~p~n",[Tag,Data]) ++ format_key_val(Rep);
 format_key_val(_) ->
     [].

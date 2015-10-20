@@ -17,7 +17,7 @@ log_it(_Priority, _NowTime, _Format, _Args, _Module, _Line, _File, _Function, _P
     ok;
 log_it(Priority, NowTime, Format, Args, Module, Line, File, Function, Pid, Flow) ->
     try
-        {Date,Time} = calendar:now_to_local_time(NowTime),
+        {Date, Time} = calendar:now_to_local_time(NowTime),
         Mk = element(3, NowTime),
         put_to_outputs({{Date, Time, Mk}, Priority, Module, Pid, Line, File, Function, Format, Args}, default, Flow)
     catch
@@ -25,10 +25,11 @@ log_it(Priority, NowTime, Format, Args, Module, Line, File, Function, Pid, Flow)
             ?INT_EXCEPT("Exception: io_lib:format ~p:~p module: ~p line: ~p", [C, E, Module, Line])
     end.
 
-put_to_outputs({Time, Priority, Module, Pid, Line, File, Function, F, A} = Params, UserStr, [#flow_handle{id = Handler, format_type = Format} | Tail]) ->
+put_to_outputs({Time, Priority, Module, Pid, Line, File, Function, F, A} = Params,
+               UserStr, [#flow_handle{id = Handler, format_type = Format} | Tail]) ->
     {FString, NewUserStr, TypeFormat} =
         case {Format, UserStr} of
-            {binary, _} -> {{F,A}, UserStr, binary};
+            {binary, _} -> {{F, A}, UserStr, binary};
             {_, default} -> Tmp = io_lib:format(F, A), {Tmp, Tmp, default};
             {_, _} -> {UserStr, UserStr, default}
         end,
@@ -38,7 +39,7 @@ put_to_outputs({Time, Priority, Module, Pid, Line, File, Function, F, A} = Param
     chronica_gen_backend:write(Handler, {FormatedStr, TypeFormat}),
     put_to_outputs(Params, NewUserStr, Tail);
 
-put_to_outputs(_,_,[]) ->
+put_to_outputs(_ , _, []) ->
     ok;
 
 put_to_outputs(Params, DefaultStr, Flow) ->
@@ -73,7 +74,7 @@ format_sys_dbg(Name, {noreply, State}, _) ->
 format_sys_dbg(Name, {notify, Event}, _) ->
     io_lib:format("*DBG* ~p got event ~p~n", [Name, Event]);
 
-format_sys_dbg(Name, {_,_,{call, Handler, Query}}, _) ->
+format_sys_dbg(Name, {_, _, {call, Handler, Query}}, _) ->
     io_lib:format("*DBG* ~p(~p) got call ~p~n", [Name, Handler, Query]);
 
 format_sys_dbg(Name, Event, _) ->

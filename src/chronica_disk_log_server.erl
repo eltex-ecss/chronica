@@ -27,7 +27,9 @@
 -include("../include/chronica_disk_log.hrl").
 -include_lib("chronica/include/chronica_int.hrl").
 
--compile({inline,[{do_get_log_pids,1}]}).
+-compile({inline, [
+                   {do_get_log_pids, 1}
+                  ]}).
 
 -record(pending, {log, pid, req, from, attach, clients}). % [{Request,From}]
 
@@ -99,7 +101,7 @@ handle_info({pending_reply, Pid, Result0}, State) ->
     if
         Attach and (Result0 =:= {error, no_such_log}) ->
             %% The chronica_disk_log process has terminated. Try again.
-            open([{Request,From} | Clients], State1);
+            open([{Request, From} | Clients], State1);
         true ->
             case Result0 of
                 _ when Attach ->
@@ -196,7 +198,7 @@ do_open({open, W, #arg{name = Name}=A}=Req, From, State) ->
                 false ->
                     case get_local_pid(Name) of
                         {local, Pid} ->
-                            do_internal_open(Name, Pid, From, Req, true,State);
+                            do_internal_open(Name, Pid, From, Req, true, State);
                         {distributed, _Pid} ->
                             {{error, {node_already_open, Name}}, State};
                         undefined ->
@@ -209,7 +211,7 @@ do_open({open, W, #arg{name = Name}=A}=Req, From, State) ->
                 undefined ->
                     start_log(Name, Req, From, State);
                 {local, _Pid} ->
-                    {{node(),{error, {node_already_open, Name}}}, State};
+                    {{node(), {error, {node_already_open, Name}}}, State};
                 {distributed, Pid} ->
                     do_internal_open(Name, Pid, From, Req, true, State)
             end
@@ -276,7 +278,7 @@ check_pending(Name, From, State, Req) ->
     case lists:keysearch(Name, #pending.log, State#state.pending) of
         {value, #pending{log = Name, clients = Clients}=P} ->
             NP = lists:keyreplace(Name, #pending.log, State#state.pending,
-                               P#pending{clients = Clients++[{Req,From}]}),
+                               P#pending{clients = Clients ++ [{Req, From}]}),
             {pending, State#state{pending = NP}};
         false ->
             false
@@ -312,7 +314,7 @@ erase_log(Name, Pid) ->
     erase(Pid).
 
 do_accessible_logs() ->
-    LocalSpec = {'$1','_',local},
+    LocalSpec = {'$1', '_', local},
     Local0 = [hd(L) || L <- ets:match(?DISK_LOG_NAME_TABLE, LocalSpec)],
     Local = lists:sort(Local0),
     Groups0 = ordsets:from_list(pg2:which_groups()),
@@ -356,7 +358,7 @@ dist_pids(LogName) ->
     [Pid | _] = Pids ->
             case rpc:call(node(Pid), ?MODULE, get_local_pid, [LogName]) of
                 undefined -> % does not seem to be a chronica_disk_log group
-                    case catch lists:member(Pid,pg2:get_members(GroupName)) of
+                    case catch lists:member(Pid, pg2:get_members(GroupName)) of
                         true -> [];
                         _ -> dist_pids(LogName)
                     end;

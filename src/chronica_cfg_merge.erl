@@ -24,9 +24,8 @@ merge_item({Key, CurrentValue}, MergedCfg) when Key =:= rules orelse
                                                 Key =:= flows orelse
                                                 Key =:= formats orelse
                                                 Key =:= internal_logger ->
-    OldValue =
-        case lists:keyfind(Key, 1, MergedCfg) of
-            {_, _OldValue} -> _OldValue;
+    OldValue = case lists:keyfind(Key, 1, MergedCfg) of
+            {_, OldValue1} -> OldValue1;
             _ -> []
         end,
     NewValue = lists:ukeymerge(1, lists:ukeysort(1, CurrentValue), lists:ukeysort(1, OldValue)),
