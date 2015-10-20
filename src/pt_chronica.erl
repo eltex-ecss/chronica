@@ -30,7 +30,7 @@ parse_transform(AST, Options) ->
     ?PATROL_DEBUG("options: ~p", [Options]),
     Module = pt_lib:get_module_name(AST),
     AST0 = pt_fun_trace:parse_transform(AST, Options),
-    AST1 = add_register_app(AST0),
+    AST1 = AST0,
 
     ?PATROL_DEBUG("AST START -------------~n~p~nAST END ---------------", [AST]),
 
@@ -375,7 +375,8 @@ args_count2([C | Tail], _Line) when C == $c; C == $f;
                              C == $s; C == $w;
                              C == $p; C == $B;
                              C == $#; C == $b;
-                             C == $+; C == $i ->
+                             C == $+; C == $i;
+                             C == $t ->
     {1, Tail};
 args_count2([C | Tail], _Line) when C == $W; C == $P;
                              C == $X; C == $x;
@@ -383,24 +384,6 @@ args_count2([C | Tail], _Line) when C == $W; C == $P;
                              C == $p ->
     {2, Tail};
 args_count2(Tail, Line) -> throw(?mk_parse_error(Line, {bad_log_param, Tail})).
-
-
-add_register_app(AST) ->
-    List = pt_lib:get_attribute_value(behaviour, AST),
-    case lists:member(application, List) of
-        true ->
-            case pt_lib:match(AST, ast_pattern("start/2 [...$_...].")) of
-                [ast_pattern("$_ [...$Clauses...].", L1)] ->
-                    NewClauses =
-                        lists:map(
-                            fun (ast_pattern("(...$P...) -> ...$E... .", L)) ->
-                                ast("(...$P...) -> chronica:register(), ...$E... .", L)
-                            end, Clauses),
-                    pt_lib:replace(AST, ast_pattern("start/2 [...$_...]."), ast("start [...$NewClauses...].", L1));
-                _ -> throw(?mk_parse_error(0, {app_no_start, pt_lib:get_module_name(AST)}))
-            end;
-        _ -> AST
-    end.
 
 add_get_log_tags_fun(ListOfProfiles, AST) ->
     pt_lib:add_function(AST, ast("get_log_tags() -> @ListOfProfiles.", 0)).
@@ -426,9 +409,6 @@ concat_module([First | Atoms]) when is_list(Atoms) ->
             end, erlang:atom_to_list(First), Atoms),
     erlang:list_to_atom(Name).
 
-
-format_error({app_no_start, Module}) ->
-    io_lib:format("Module ~p implements behaviour application, but have no start function", [Module]);
 format_error({list_forget_var, Args}) ->
     io_lib:format("Args parameter should be list: ~p, (use _ to skip error)", [Args]);
 format_error({invalid_args, Str, Args}) ->
