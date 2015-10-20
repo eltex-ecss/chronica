@@ -8,6 +8,8 @@
 %%%-------------------------------------------------------------------
 -module(chronica).
 
+-dialyzer({no_match, register/1}).
+
 -include("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 -include("chronica_config.hrl").
@@ -36,8 +38,7 @@ register() ->
             {error, no_application}
     end.
 
--spec register(atom()) -> ok | {error, term()}.
-
+-spec register(atom()) -> no_return().
 register(App) ->
     true = chronica_status:configured(),
     chronica_manager:add_application(App).
