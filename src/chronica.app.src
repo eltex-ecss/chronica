@@ -7,6 +7,8 @@
         kernel,
         stdlib,
         sasl,
+        compiler,
+        syntax_tools,
         pt_lib,
         pt_scripts
     ]},

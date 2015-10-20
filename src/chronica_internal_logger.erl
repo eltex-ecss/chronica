@@ -8,6 +8,8 @@
 %%%-------------------------------------------------------------------
 -module(chronica_internal_logger).
 
+-dialyzer({no_match, close/0}).
+
 -export([init/1, close/0, log_error/6, log_warning/6, log_info/6, log_debug/6]).
 
 -include_lib("pt_scripts/include/pt_pmodule.hrl").
@@ -51,8 +53,6 @@ init(Params) ->
         throw:Err -> Err
     end.
 
-
--dialyzer({no_match, close/0}).
 -spec close() -> ok | {error, term()}.
 close() ->
     Handle =
