@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(chronica_file_backend).
 
--include_lib("chronica/include/chronica_int.hrl").
+-include_lib("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
 -behaviour(chronica_gen_backend).

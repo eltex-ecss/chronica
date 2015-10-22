@@ -24,8 +24,8 @@
 -export([init/1, handle_call/3, handle_info/2, terminate/2]).
 -export([handle_cast/2, code_change/3]). % just to avoid compiler warning
 
--include("../include/chronica_disk_log.hrl").
--include_lib("chronica/include/chronica_int.hrl").
+-include("chronica_disk_log.hrl").
+-include("chronica_int.hrl").
 
 -compile({inline, [
                    {do_get_log_pids, 1}

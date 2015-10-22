@@ -12,7 +12,7 @@
 
 -export([start/2, stop/1, prep_stop/1]).
 
--include_lib("chronica/include/chronica_config.hrl").
+-include_lib("chronica_config.hrl").
 -include_lib("pt_scripts/include/pt_versioned.hrl").
 
 %%====================================================================

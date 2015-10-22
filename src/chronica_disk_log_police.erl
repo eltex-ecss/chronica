@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(chronica_disk_log_police).
 
--include_lib("chronica/include/chronica_int.hrl").
+-include_lib("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
 -export([start/1, stop/0, loop/1]).
