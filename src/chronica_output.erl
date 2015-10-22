@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(chronica_output).
 
--include("../include/chronica_int.hrl").
+-include("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
 -export([log_it/10, format_sys_dbg/3]).

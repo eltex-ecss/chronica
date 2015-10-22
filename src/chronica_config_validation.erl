@@ -10,7 +10,7 @@
 
 -export([validate/1, validate_internal_logger/1]).
 
--include("../include/chronica_config.hrl").
+-include("chronica_config.hrl").
 
 validate(#chronica_config
                 {

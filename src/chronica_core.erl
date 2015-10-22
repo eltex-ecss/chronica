@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(chronica_core).
 
--include("../include/chronica_int.hrl").
+-include("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 -include_lib("pt_scripts/include/pt_recompilable.hrl").
 

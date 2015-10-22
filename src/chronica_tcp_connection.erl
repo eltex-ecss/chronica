@@ -10,7 +10,7 @@
 
 -behaviour(gen_server).
 
--include("../include/chronica_int.hrl").
+-include("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
 %% API

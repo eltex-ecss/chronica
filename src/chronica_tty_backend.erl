@@ -11,7 +11,7 @@
 -behaviour(chronica_gen_backend).
 -behaviour(gen_server).
 
--include("../include/chronica_int.hrl").
+-include("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
 -export([handle_open/2, handle_close/1, handle_write/3, handle_clear/1, handle_rotate/1, handle_check/1]).

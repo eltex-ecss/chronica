@@ -16,7 +16,7 @@
 %% Supervisor callbacks
 -export([init/1]).
 
--include("../include/chronica_int.hrl").
+-include("chronica_int.hrl").
 
 -define(SERVER, ?MODULE).
 

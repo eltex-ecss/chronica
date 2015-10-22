@@ -15,8 +15,8 @@
          insert_tab/1
         ]).
 
--include("../include/chronica_int.hrl").
--include("../include/chronica_config.hrl").
+-include("chronica_int.hrl").
+-include("chronica_config.hrl").
 -include_lib("pt_lib/include/pt_lib.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
