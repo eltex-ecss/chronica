@@ -25,6 +25,7 @@
 -patrol([{tty, error}]).
 
 parse_transform(AST, Options) ->
+    io:setopts({encoding, unicode}),
     File = pt_lib:get_file_name(AST),
     ?PATROL_DEBUG("parse transforming: ~s", [File]),
     ?PATROL_DEBUG("options: ~p", [Options]),
