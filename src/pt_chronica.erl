@@ -33,7 +33,7 @@ parse_transform(AST, Options) ->
     AST0 = pt_fun_trace:parse_transform(AST, Options),
     AST1 = AST0,
 
-    ?PATROL_DEBUG("AST START -------------~n~p~nAST END ---------------", [AST]),
+    %% ?PATROL_DEBUG("AST START -------------~n~p~nAST END ---------------", [AST]),
 
     Iface = generate_module_iface_name(Module),
 
@@ -89,7 +89,7 @@ parse_transform(AST, Options) ->
 
     AST5 = pt_macro:parse_transform(AST4, Options),
 
-    ?PATROL_DEBUG("NEW AST START -------------~n~p~nNEW AST END ---------------~n", [AST5]),
+    %% ?PATROL_DEBUG("NEW AST START -------------~n~p~nNEW AST END ---------------~n", [AST5]),
     AST5.
 
 
