@@ -32,7 +32,7 @@ parse_transform(AST, Options) ->
     Module = pt_lib:get_module_name(AST),
     AST0 = pt_fun_trace:parse_transform(AST, Options),
     AST1 = AST0,
-
+    Chronica_Tags = find_implicit_tags(AST1, []),
     %% ?PATROL_DEBUG("AST START -------------~n~p~nAST END ---------------", [AST]),
 
     Iface = generate_module_iface_name(Module),
@@ -65,21 +65,21 @@ parse_transform(AST, Options) ->
             {ast_pattern("log:$FunName('$String').", Line) = ICall, Acc},
             begin
                 fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_one, String})
+                 ICall, Acc, {arity_one, String}, Chronica_Tags)
             end
         },
         {
             {ast_pattern("log:$FunName('$String', '$Args').", Line) = ICall, Acc},
             begin
                 fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_two, String, Args})
+                 ICall, Acc, {arity_two, String, Args}, Chronica_Tags)
             end
         },
         {
             {ast_pattern("log:$FunName('$Tags', '$String', '$Args').", Line) = ICall, Acc},
             begin
                 fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_three, String, Args, Tags})
+                 ICall, Acc, {arity_three, String, Args, Tags}, Chronica_Tags)
             end
         }], []),
 
@@ -92,6 +92,12 @@ parse_transform(AST, Options) ->
     %% ?PATROL_DEBUG("NEW AST START -------------~n~p~nNEW AST END ---------------~n", [AST5]),
     AST5.
 
+find_implicit_tags([], Acc) ->
+    Acc;
+find_implicit_tags([{attribute, _, chronica_tag, Param} | Tail], Acc) ->
+    find_implicit_tags(Tail, [Param | Acc]);
+find_implicit_tags([_ | Tail], Acc) ->
+    find_implicit_tags(Tail, Acc).
 
 search_control_symbol(_, true) ->
     true;
@@ -160,11 +166,11 @@ asttags2list(Tags, Line) ->
             throw(?mk_parse_error(Line, non_static_tags))
     end.
 
-fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity) ->
+fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity, Chronica_Tags) ->
     case mapFunToPriority(Level) of
         {ok, Priority} ->
             LogId = log_id(Module, Line),
-            Tags = [Module, LogId],
+            Tags = [Module, LogId] ++ Chronica_Tags,
             case Arity of
                 {arity_one, String} ->
                     fun_arity_one(Priority, Iface, Tags, Module, Line, File, Acc, String);
@@ -172,7 +178,7 @@ fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity) ->
                     fun_arity_two(Priority, Iface, Tags, Module, Line, File, Acc, String, Args);
                 {arity_three, String, Args, ASTTags} ->
                     NewTags = asttags2list(ASTTags, Line),
-                    fun_arity_three(Priority, Iface, NewTags, Module, Line, File, Acc, String, Args)
+                    fun_arity_three(Priority, Iface, Tags ++ NewTags, Module, Line, File, Acc, String, Args)
             end;
         {error, _} ->
             {ICall, Acc}
