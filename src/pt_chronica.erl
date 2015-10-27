@@ -186,72 +186,43 @@ fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity, Chronica_Tags) ->
 
 fun_arity_one(Priority, Iface, Tags, Module, Line, File, Acc, String) ->
     check_log_params(String, ast("[].", 1), Line),
-    {NewStringParam, Positions} = detective_stacktrace_string(wrapParam(String)),
-    case Positions of
-        false ->
-            {ast("chronica_core:log_fast(@Iface, @Priority, @Tags, '@Module', '@Line', '@File', pt_macro_define(function_string), $String, []).", Line), [Tags|Acc]};
-        _ ->
-            {Args2, Chronica_stacktrace_line} = set_stacktrace_args([], Positions, Line),
-            NewArgsParam = wrapParam(Args2),
-            {ast("begin $Chronica_stacktrace_line = erlang:get_stacktrace(), chronica_core:log_fast(@Iface, @Priority, @Tags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam) end.", Line), [Tags|Acc]}
-    end.
+    NewStringParam = wrapParam(String),
+    {ast("chronica_core:log_fast(@Iface, @Priority, @Tags, '@Module', '@Line', '@File', pt_macro_define(function_string), $NewStringParam, []).", Line), [Tags|Acc]}.
 
 fun_arity_two(Priority, Iface, Tags, Module, Line, File, Acc, String, Args) ->
-    search_args(Args, File),
     check_log_params(String, Args, Line),
-    {NewStringParam, Positions} = detective_stacktrace_string(wrapParam(String)),
+    NewStringParam = wrapParam(String),
+    Positions = detective_stacktrace(Args, [], 0),
     {Args2, Chronica_stacktrace_line} = set_stacktrace_args(Args, Positions, Line),
     NewArgsParam = wrapParam(Args2),
     case Positions of
-        false ->
+        [] ->
             {ast("chronica_core:log_fast(@Iface, @Priority, @Tags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam).", Line), [Tags|Acc]};
         _ ->
             {ast("begin $Chronica_stacktrace_line = erlang:get_stacktrace(), chronica_core:log_fast(@Iface, @Priority, @Tags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam) end.", Line), [Tags|Acc]}
     end.
 
 fun_arity_three(Priority, Iface, NewTags, Module, Line, File, Acc, String, Args) ->
-    search_args(Args, File),
     check_log_params(String, Args, Line),
-    {NewStringParam, Positions} = detective_stacktrace_string(wrapParam(String)),
+    NewStringParam = wrapParam(String),
+    Positions = detective_stacktrace(Args, [], 0),
     {Args2, Chronica_stacktrace_line} = set_stacktrace_args(Args, Positions, Line),
     NewArgsParam = wrapParam(Args2),
     case Positions of
-        false ->
+        [] ->
             {ast("chronica_core:log_fast(@Iface,@Priority, @NewTags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam).", Line), [NewTags|Acc]};
         _ ->
             {ast("begin $Chronica_stacktrace_line = erlang:get_stacktrace(), chronica_core:log_fast(@Iface, @Priority, @NewTags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam) end.", Line), [NewTags|Acc]}
     end.
 
-detective_stacktrace_string({string, CountLine, StringParam}) ->
-    {NewStringParam, Positions} = detective_activate(chronica_parser:tokenize_format_string(StringParam), "", [], 0),
-    {{string, CountLine, NewStringParam}, Positions};
+detective_stacktrace({nil, _}, Positions, _) ->
+    lists:reverse(Positions);
+detective_stacktrace({cons, _, {call, _, {remote, _, {atom, _, erlang}, {atom, _, get_stacktrace}}, _}, Tail}, Positions, CurrentPosition) ->
+    detective_stacktrace(Tail, [CurrentPosition | Positions], CurrentPosition + 1);
+detective_stacktrace({_, _, _, Tail}, Positions, CurrentPosition) ->
+    detective_stacktrace(Tail, Positions, CurrentPosition + 1).
 
-detective_stacktrace_string({Type, CountLine, StringParam}) ->
-    {{Type, CountLine, StringParam}, false}.
-
-detective_activate([], Acc, [], _CurrentPosition) ->
-    {Acc, false};
-detective_activate([], Acc, Positions, _CurrentPosition) ->
-    {Acc, lists:reverse(Positions)};
-detective_activate([Param | Tail], Acc, Positions, CurrentPosition) ->
-    case Param of
-        {_, control, "~S"} ->
-            NewCurrentPosition = CurrentPosition + 1,
-            detective_activate(Tail, Acc ++ "~p", [CurrentPosition | Positions], NewCurrentPosition);
-        {_, string, String} ->
-            detective_activate(Tail, Acc ++ String, Positions, CurrentPosition);
-        {_, control, String} ->
-            NewCurrentPosition = CurrentPosition + 1,
-            detective_activate(Tail, Acc ++ String, Positions, NewCurrentPosition)
-    end.
-
-set_stacktrace_args([], false, _) ->
-    [];
-set_stacktrace_args([], Positions, Line) ->
-    Chronica_stacktrace_line = erlang:list_to_atom("Chronica_stacktrace" ++ erlang:integer_to_list(Line)),
-    {set_activate({nil, Line}, 0, Positions, Chronica_stacktrace_line), {var, Line, Chronica_stacktrace_line}};
-
-set_stacktrace_args(ArgsParam, false, _Line) ->
+set_stacktrace_args(ArgsParam, [], _Line) ->
     {ArgsParam, ""};
 set_stacktrace_args(ArgsParam, Positions, Line) ->
     Chronica_stacktrace_line = erlang:list_to_atom("Chronica_stacktrace" ++ erlang:integer_to_list(Line)),
@@ -264,35 +235,12 @@ set_activate({nil, CountLine} = ArgsParam, _, Positions, Chronica_stacktrace_lin
             {cons, CountLine, {var, CountLine, Chronica_stacktrace_line}, Acc}
         end,
     lists:foldl(F, ArgsParam, Positions);
-set_activate({Type, CountLine, Param, Tail}, CurrentPosition, [CurrentPosition|T], Chronica_stacktrace_line) ->
-    Tail2 = set_activate({Type, CountLine, Param, Tail}, CurrentPosition + 1, T, Chronica_stacktrace_line),
-    Tail3 =  {cons, CountLine, {var, CountLine, Chronica_stacktrace_line}, Tail2},
-    Tail3;
+set_activate({_, CountLine, _, Tail}, CurrentPosition, [CurrentPosition|T], Chronica_stacktrace_line) ->
+    Tail2 = set_activate(Tail, CurrentPosition + 1, T, Chronica_stacktrace_line),
+    {cons, CountLine, {var, CountLine, Chronica_stacktrace_line}, Tail2};
 set_activate({Type, CountLine, Param, Tail}, CurrentPosition, Positions, Chronica_stacktrace_line) ->
     Tail2 = set_activate(Tail, CurrentPosition + 1, Positions, Chronica_stacktrace_line),
     {Type, CountLine, Param, Tail2}.
-
-search_args({nil, _}, _) ->
-    complete;
-search_args({_, _, Param, Tail}, File) ->
-    search_call(Param, File),
-    search_args(Tail, File);
-search_args(_, _) ->
-    complete.
-
-search_call({call, _, Param, _}, File) ->
-    search_stacktrace(Param, File);
-search_call(_, _) ->
-    complete.
-
-search_stacktrace({remote, _, _, Param_two}, File) ->
-    search_stacktrace(Param_two, File);
-search_stacktrace({_, CountLine, get_stacktrace}, File) ->
-    {ok, Cwd} = file:get_cwd(),
-    FullFile = filename:join(Cwd, File),
-    io:format("~ts:~p: Warning: implicit called get_stacktrace~n", [FullFile, CountLine]);
-search_stacktrace(_, _) ->
-    complete.
 
 parse_str_debug(Str) ->
     ToAST = fun (Str1) ->
