@@ -94,8 +94,10 @@ parse_transform(AST, Options) ->
 
 find_implicit_tags([], Acc) ->
     Acc;
-find_implicit_tags([{attribute, _, chronica_tag, Param} | Tail], Acc) ->
+find_implicit_tags([{attribute, _, chronica_tag, Param} | Tail], Acc) when is_atom(Param)->
     find_implicit_tags(Tail, [Param | Acc]);
+find_implicit_tags([{attribute, _, chronica_tag, Param} | Tail], Acc) when is_list(Param)->
+    find_implicit_tags(Tail, Param ++ Acc);
 find_implicit_tags([_ | Tail], Acc) ->
     find_implicit_tags(Tail, Acc).
 
