@@ -218,6 +218,7 @@ fun_arity_three(Priority, Iface, NewTags, Module, Line, File, Acc, String, Args)
             {ast("begin $Chronica_stacktrace_line = erlang:get_stacktrace(), chronica_core:log_fast(@Iface, @Priority, @NewTags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam) end.", Line), [NewTags|Acc]}
     end.
 
+detective_stacktrace({var, _, _}, _, _) -> [];
 detective_stacktrace({nil, _}, Positions, _) ->
     lists:reverse(Positions);
 detective_stacktrace({cons, _, {call, _, {remote, _, {atom, _, erlang}, {atom, _, get_stacktrace}}, _}, Tail}, Positions, CurrentPosition) ->
