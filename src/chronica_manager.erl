@@ -1027,14 +1027,14 @@ get_appropriate_flows([], _Priority, _Rules) -> [];
 get_appropriate_flows(Key, Priority, Rules) when is_atom(Key) ->
     ?INT_DBG("get_appropriate_flows for: ~p", [Key]),
     KeyStr = atom_to_list(Key),
-    lists:usort([ Flows || #rule{flows = Flows} <-
+    lists:usort(lists:flatten([ Flows || #rule{flows = Flows} <-
         lists:filter(
             fun(#rule{rule_str = RuleStr, log_priority = LPriority}) ->
                     LPriority >= Priority andalso rule_match(RuleStr, KeyStr)
-            end, Rules) ]);
+            end, Rules) ]));
 get_appropriate_flows([K|_] = Keys, Priority, Rules) when is_list(Keys), is_atom(K) ->
     ?INT_DBG("get_appropriate_flows for: ~p", [Keys]),
-    lists:flatten(lists:usort([ get_appropriate_flows(Key, Priority, Rules) ||
+    lists:usort(lists:flatten([ get_appropriate_flows(Key, Priority, Rules) ||
                                 Key <- Keys ]));
 get_appropriate_flows(Key, _, _) ->
     erlang:error({bad_tags, Key}).
@@ -1432,7 +1432,6 @@ generate_iface_module(ModuleName, Rules, Tags) ->
 
             Clauses2 = generate_clauses_for_get_flows(TagList, Flows) ++ [DefaultClause2],
             AST3 = pt_lib:add_function(AST2, ast("get_flows [...$Clauses2...].", 0)),
-
             case compile:forms(AST3, [binary, return_errors]) of
                 {ok, IfaceName, Binary} ->
                     ?INT_DBG("Compiled iface module for ~p: ~p", [ModuleName, IfaceName]),
