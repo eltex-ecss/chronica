@@ -92,8 +92,9 @@ parse_transform(AST, Options) ->
     %% ?PATROL_DEBUG("NEW AST START -------------~n~p~nNEW AST END ---------------~n", [AST5]),
     AST5.
 
+-spec find_implicit_tags(erl_syntax:syntaxTree(), [atom()]) -> [atom()].
 find_implicit_tags([], Acc) ->
-    Acc;
+    lists:usort(Acc);
 find_implicit_tags([{attribute, _, chronica_tag, Param} | Tail], Acc) when is_atom(Param)->
     find_implicit_tags(Tail, [Param | Acc]);
 find_implicit_tags([{attribute, _, chronica_tag, Param} | Tail], Acc) when is_list(Param)->
