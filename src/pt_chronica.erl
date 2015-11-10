@@ -92,8 +92,9 @@ parse_transform(AST, Options) ->
     %% ?PATROL_DEBUG("NEW AST START -------------~n~p~nNEW AST END ---------------~n", [AST5]),
     AST5.
 
+-spec find_implicit_tags(erl_syntax:syntaxTree(), [atom()]) -> [atom()].
 find_implicit_tags([], Acc) ->
-    Acc;
+    lists:usort(Acc);
 find_implicit_tags([{attribute, _, chronica_tag, Param} | Tail], Acc) when is_atom(Param)->
     find_implicit_tags(Tail, [Param | Acc]);
 find_implicit_tags([{attribute, _, chronica_tag, Param} | Tail], Acc) when is_list(Param)->
@@ -217,6 +218,7 @@ fun_arity_three(Priority, Iface, NewTags, Module, Line, File, Acc, String, Args)
             {ast("begin $Chronica_stacktrace_line = erlang:get_stacktrace(), chronica_core:log_fast(@Iface, @Priority, @NewTags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam) end.", Line), [NewTags|Acc]}
     end.
 
+detective_stacktrace({var, _, _}, _, _) -> [];
 detective_stacktrace({nil, _}, Positions, _) ->
     lists:reverse(Positions);
 detective_stacktrace({cons, _, {call, _, {remote, _, {atom, _, erlang}, {atom, _, get_stacktrace}}, _}, Tail}, Positions, CurrentPosition) ->
