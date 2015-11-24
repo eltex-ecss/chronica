@@ -30,6 +30,9 @@ parse_transform(AST, Options) ->
     ?PATROL_DEBUG("parse transforming: ~s", [File]),
     ?PATROL_DEBUG("options: ~p", [Options]),
     Module = pt_lib:get_module_name(AST),
+    {ok, Cwd} = file:get_cwd(),
+    [App1 | _]= lists:reverse(string:tokens(Cwd, "/")),
+    App2 = list_to_atom(App1),
     AST0 = pt_fun_trace:parse_transform(AST, Options),
     AST1 = AST0,
     Chronica_Tags = find_implicit_tags(AST1, []),
@@ -65,21 +68,21 @@ parse_transform(AST, Options) ->
             {ast_pattern("log:$FunName('$String').", Line) = ICall, Acc},
             begin
                 fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_one, String}, Chronica_Tags)
+                 ICall, Acc, {arity_one, String}, Chronica_Tags, App2)
             end
         },
         {
             {ast_pattern("log:$FunName('$String', '$Args').", Line) = ICall, Acc},
             begin
                 fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_two, String, Args}, Chronica_Tags)
+                 ICall, Acc, {arity_two, String, Args}, Chronica_Tags, App2)
             end
         },
         {
             {ast_pattern("log:$FunName('$Tags', '$String', '$Args').", Line) = ICall, Acc},
             begin
                 fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_three, String, Args, Tags}, Chronica_Tags)
+                 ICall, Acc, {arity_three, String, Args, Tags}, Chronica_Tags, App2)
             end
         }], []),
 
@@ -169,11 +172,11 @@ asttags2list(Tags, Line) ->
             throw(?mk_parse_error(Line, non_static_tags))
     end.
 
-fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity, Chronica_Tags) ->
+fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity, Chronica_Tags, App2) ->
     case mapFunToPriority(Level) of
         {ok, Priority} ->
             LogId = log_id(Module, Line),
-            Tags = [Module, LogId] ++ Chronica_Tags,
+            Tags = [Module, LogId, App2] ++ Chronica_Tags,
             case Arity of
                 {arity_one, String} ->
                     fun_arity_one(Priority, Iface, Tags, Module, Line, File, Acc, String);
