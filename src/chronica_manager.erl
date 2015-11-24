@@ -1381,7 +1381,6 @@ generate_app_iface_modules(App, Rules) ->
 
     lists:foldl(
         fun (M, Acc) ->
-            timer:sleep(5), % reduce overload
             ?INT_DBG("Generating iface module for ~p", [M]),
             NewAcc =
                 case generate_iface_module(M, Rules) of
@@ -1410,6 +1409,7 @@ generate_iface_module(ModuleName, Rules, Tags) ->
         [] ->
             undefined;
         _ ->
+            timer:sleep(5), % reduce overload
             IfaceName = pt_chronica:generate_module_iface_name(ModuleName),
             AST  = pt_lib:create_clear_ast(IfaceName),
 

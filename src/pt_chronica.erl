@@ -30,6 +30,7 @@ parse_transform(AST, Options) ->
     ?PATROL_DEBUG("parse transforming: ~s", [File]),
     ?PATROL_DEBUG("options: ~p", [Options]),
     Module = pt_lib:get_module_name(AST),
+    App = get_app(),
     AST0 = pt_fun_trace:parse_transform(AST, Options),
     AST1 = AST0,
     Chronica_Tags = find_implicit_tags(AST1, []),
@@ -65,21 +66,21 @@ parse_transform(AST, Options) ->
             {ast_pattern("log:$FunName('$String').", Line) = ICall, Acc},
             begin
                 fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_one, String}, Chronica_Tags)
+                 ICall, Acc, {arity_one, String}, Chronica_Tags, App)
             end
         },
         {
             {ast_pattern("log:$FunName('$String', '$Args').", Line) = ICall, Acc},
             begin
                 fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_two, String, Args}, Chronica_Tags)
+                 ICall, Acc, {arity_two, String, Args}, Chronica_Tags, App)
             end
         },
         {
             {ast_pattern("log:$FunName('$Tags', '$String', '$Args').", Line) = ICall, Acc},
             begin
                 fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_three, String, Args, Tags}, Chronica_Tags)
+                 ICall, Acc, {arity_three, String, Args, Tags}, Chronica_Tags, App)
             end
         }], []),
 
@@ -91,6 +92,21 @@ parse_transform(AST, Options) ->
 
     %% ?PATROL_DEBUG("NEW AST START -------------~n~p~nNEW AST END ---------------~n", [AST5]),
     AST5.
+
+get_app() ->
+    case filelib:wildcard("src/*.app.src") of
+        [Name_app_src| _] ->
+            {ok, [{_, Name_app1, _}]} = file:consult(Name_app_src),
+            list_to_atom("application_" ++ atom_to_list(Name_app1));
+        _ ->
+            case filelib:wildcard("ebin/*.app") of
+                [Name_app_ebin | _] ->
+                    {ok, [{_, Name_app2, _}]} = file:consult(Name_app_ebin),
+                    list_to_atom("application_" ++ atom_to_list(Name_app2));
+                _ ->
+                    []
+            end
+    end.
 
 -spec find_implicit_tags(erl_syntax:syntaxTree(), [atom()]) -> [atom()].
 find_implicit_tags([], Acc) ->
@@ -169,11 +185,11 @@ asttags2list(Tags, Line) ->
             throw(?mk_parse_error(Line, non_static_tags))
     end.
 
-fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity, Chronica_Tags) ->
+fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity, Chronica_Tags, App) ->
     case mapFunToPriority(Level) of
         {ok, Priority} ->
             LogId = log_id(Module, Line),
-            Tags = [Module, LogId] ++ Chronica_Tags,
+            Tags = [Module, LogId, App] ++ Chronica_Tags,
             case Arity of
                 {arity_one, String} ->
                     fun_arity_one(Priority, Iface, Tags, Module, Line, File, Acc, String);

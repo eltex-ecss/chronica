@@ -1,17 +1,27 @@
-.PHONY: all deps compile eunit clean
+.PHONY: all deps compile test eunit inttest clean
 
-all: deps compile eunit dialyze
+RETEST=${PWD}/deps/retest/retest
+LOG_LEVEL?=debug
+RT_TARGETS?=inttest
+
+all: deps compile test dialyze
 
 deps:
-	rebar g-d u-d
+	@REBAR_EXTRA_DEPS=1 rebar get-deps u-d
+	@(cd deps/retest && rebar compile escriptize)
 
 compile:
 	rebar co
 
+test: eunit inttest
+
 eunit:
 	rebar eunit skip_deps=true
 
-dialyze: .rebar/*.plt 
+inttest:
+	@${RETEST} -l ${LOG_LEVEL} ${RT_TARGETS}
+
+dialyze: .rebar/*.plt
 	rebar dialyze
 
 .rebar/*.plt:
