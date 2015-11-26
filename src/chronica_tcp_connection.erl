@@ -114,7 +114,8 @@ handle_cast(start_accept, State = #s{listen_socket = ListenSocket, man_mon = Man
 handle_cast({close, Reason}, State) ->
     {stop, Reason, State};
 
-handle_cast({add_tcp_connection_result, {ok, Rule}}, State = #s{}) ->
+handle_cast({add_tcp_connection_result, {ok, Rule}}, State = #s{socket = Socket}) ->
+    gen_tcp:send(Socket, io_lib:format("~s~n", ["cache is recompiled"])),
     {noreply, State#s{state = sending_data, name = Rule}};
 
 handle_cast({add_tcp_connection_result, {error, Error}}, State = #s{}) ->
