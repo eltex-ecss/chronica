@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/eltex-ecss/chronica.svg?branch=master)](https://travis-ci.org/eltex-ecss/chronica)
 <p align="center">
 <img src="https://raw.githubusercontent.com/eltex-ecss/chronica/master/doc/chronica.jpg"/>
 </p>
