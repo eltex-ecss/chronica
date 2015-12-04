@@ -1022,16 +1022,51 @@ switch_off() ->
         end),
     Res.
 
+get_appropriate_flows_exclusion(KeyModule, Rules) ->
+    KeyStrModule = atom_to_list(KeyModule),
+    lists:filter(fun(#rule{rule_str = RuleStr}) ->
+                    ListBoolRule = rule_match3(RuleStr, KeyStrModule),
+                    find_signal_flag(ListBoolRule)
+                end, Rules).
+
+rule_match3(Rule, Key) when is_list(Rule) ->
+    rule_match2(Key, tokens(Rule));
+rule_match3({"!", {Rule}}, Key) ->
+    case rule_match3(Rule, Key) of
+        true ->
+            {false, global};
+        Res ->
+            not Res
+    end;
+rule_match3({"&", {Op1, Op2}}, Key) ->
+    [rule_match3(Op1, Key), rule_match3(Op2, Key)];
+rule_match3({"|", {Op1, Op2}}, Key) ->
+    [rule_match3(Op1, Key), rule_match3(Op2, Key)].
+
+find_signal_flag([{false,global} | _]) ->
+    false;
+find_signal_flag([Res | Tail]) ->
+    case find_signal_flag(Res) of
+        true ->
+            find_signal_flag(Tail);
+        _ ->
+            false
+    end;
+find_signal_flag(_) ->
+    true.
+
 get_appropriate_flows(_Key, _Priority, null) -> [];
 get_appropriate_flows([], _Priority, _Rules) -> [];
 get_appropriate_flows(Key, Priority, Rules) when is_atom(Key) ->
     ?INT_DBG("get_appropriate_flows for: ~p", [Key]),
     KeyStr = atom_to_list(Key),
-    lists:usort(lists:flatten([ Flows || #rule{flows = Flows} <-
-        lists:filter(
-            fun(#rule{rule_str = RuleStr, log_priority = LPriority}) ->
-                    LPriority >= Priority andalso rule_match(RuleStr, KeyStr)
-            end, Rules) ]));
+    F = fun(#rule{rule_str = RuleStr, log_priority = LPriority, flows = Flows}, R) ->
+            case LPriority >= Priority andalso rule_match(RuleStr, KeyStr) of
+                true -> [Flows, R];
+                _else -> R
+            end
+        end,
+    lists:usort(lists:flatten(lists:foldl(F, [], Rules)));
 get_appropriate_flows([K|_] = Keys, Priority, Rules) when is_list(Keys), is_atom(K) ->
     ?INT_DBG("get_appropriate_flows for: ~p", [Keys]),
     lists:usort(lists:flatten([ get_appropriate_flows(Key, Priority, Rules) ||
@@ -1050,6 +1085,7 @@ rule_match({"&", {Op1, Op2}}, Key) ->
 rule_match({"|", {Op1, Op2}}, Key) ->
     rule_match(Op1, Key) orelse rule_match(Op2, Key).
 
+%% TODO: !?
 tokens([$! | Tail]) ->
     {Res, TmpList} = tokens_(Tail),
     ["!", TmpList | Res];
@@ -1416,15 +1452,15 @@ generate_iface_module(ModuleName, Rules, Tags) ->
             DefaultClause =
                 ast("(Priority, Key, Module, Line, File, Function, Format, Args, Self, Now) ->
                         chronica_core:sync_fast_log({fast_log_message, Priority, Format, Args, Module, Line, File, Function, Self, Now, @IfaceName, Key}).", 0),
+            Rules2 = get_appropriate_flows_exclusion(ModuleName, Rules),
 
             Flows = [
-                        {Tags2, [{Priority, get_appropriate_flows(Tags2, Priority, Rules)} || Priority <- [?P_ERROR, ?P_WARNING, ?P_INFO, ?P_TRACE, ?P_DEBUG]]}
+                {Tags2, [{Priority, get_appropriate_flows(Tags2, Priority, Rules2)} || Priority <- [?P_ERROR, ?P_WARNING, ?P_INFO, ?P_TRACE, ?P_DEBUG]]}
 
-                        ||
+                ||
 
-                        Tags2 <- TagList
-                    ],
-
+                Tags2 <- TagList
+            ],
             Clauses = generate_clauses(TagList, Flows) ++ [DefaultClause],
             AST2 = pt_lib:add_function(AST, ast("log_fast [...$Clauses...].", 0)),
 

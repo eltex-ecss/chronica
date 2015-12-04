@@ -17,8 +17,8 @@ files() ->
     ].
 
 run(_Dir) ->
-    {ok, _} = retest_sh:run("rebar compile", []),
-    {ok, _} = retest_sh:run("relx", []),
+    {ok, _} = retest_sh:run("$REBAR compile", []),
+    {ok, _} = retest_sh:run("$RELX", []),
     {ok, _} = retest_sh:run("./release/sella/bin/sella-0.0.1 console", []),
     ok.
 
