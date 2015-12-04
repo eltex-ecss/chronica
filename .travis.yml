@@ -1,4 +1,10 @@
 language: erlang
+before_install:
+    - wget https://github.com/rebar/rebar/releases/download/2.6.1/rebar
+    - wget https://github.com/erlware/relx/releases/download/v3.5.0/relx
+    - chmod +x rebar
+    - chmod +x relx
+script: "./rebar -V && make travis"
 otp_release:
     - R16B03-1
     - 17.5
