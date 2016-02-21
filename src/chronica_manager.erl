@@ -1713,7 +1713,7 @@ bin2hex(Hex) when is_list(Hex) ->
 -define(d2012_11_16_1_25_41, 63520248341000000).
 
 generate_name(Prefix) ->
-    Now = {_, _, M} = now(),
+    Now = {_, _, M} = os:timestamp(),
     DT = calendar:now_to_universal_time(Now),
     N = calendar:datetime_to_gregorian_seconds(DT) * 1000000 + M - ?d2012_11_16_1_25_41,
 

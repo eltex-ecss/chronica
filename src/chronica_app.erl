@@ -20,7 +20,7 @@
 %%====================================================================
 start(_Type, StartArgs) ->
     io:format("Starting Chronica... ~n", []),
-    Now = now(),
+    Now = os:timestamp(),
 
     Config = case chronica_manager:read_config(Now) of
         {ok, Cfg} ->
