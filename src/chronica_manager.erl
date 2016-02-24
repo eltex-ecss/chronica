@@ -1431,14 +1431,10 @@ generate_app_iface_modules(App, Rules) ->
         end, [], AppModules).
 
 generate_iface_module(ModuleName, Rules) ->
-    generate_iface_module(ModuleName, Rules, []).
-
-generate_iface_module(ModuleName, Rules, Tags) ->
     TagList =
         case (catch ModuleName:get_log_tags()) of
-            Tags2 when is_list(Tags2) ->
-                lists:usort(Tags ++ Tags2);
-            _ -> Tags
+            Tags when is_list(Tags) -> Tags;
+            _ -> []
         end,
 
     case TagList of
@@ -1464,7 +1460,7 @@ generate_iface_module(ModuleName, Rules, Tags) ->
             Clauses = generate_clauses(TagList, Flows) ++ [DefaultClause],
             AST2 = pt_lib:add_function(AST, ast("log_fast [...$Clauses...].", 0)),
 
-            DefaultClause2 = ast("(Tags, Priority) -> not_found.", 0),
+            DefaultClause2 = ast("([], Priority) -> not_found.", 0),
 
             Clauses2 = generate_clauses_for_get_flows(TagList, Flows) ++ [DefaultClause2],
             AST3 = pt_lib:add_function(AST2, ast("get_flows [...$Clauses2...].", 0)),

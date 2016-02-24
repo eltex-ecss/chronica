@@ -22,16 +22,6 @@
 
 default({{{Year, Month, Day}, {Hour, Minute, Second}, Millisecond},
          PriorityInt, Module, Pid, Line, _File, Function, UserStr}) ->
-    Get_priority_prefix_up = fun(Priority) ->
-        case Priority of
-            1 -> <<"ERROR">>;
-            2 -> <<"WARN ">>;
-            3 -> <<"INFO ">>;
-            4 -> <<"TRACE">>;
-            5 -> <<"DEBUG">>
-        end
-    end,
-
     Y_binary = year_binary(Year),
     Mo_binary = time(Month),
     D_binary = time(Day),
@@ -39,11 +29,11 @@ default({{{Year, Month, Day}, {Hour, Minute, Second}, Millisecond},
     Minute_binary = time(Minute),
     Second_binary = time(Second),
     MilliSecond_binary = msecond_binary(Millisecond),
-    Priority_cap_binary = Get_priority_prefix_up(PriorityInt),
+    Priority_cap_binary = get_priority_prefix_up(PriorityInt),
     Pid_binary = erlang:list_to_binary(erlang:pid_to_list(Pid)),
-    Module_binary = erlang:list_to_binary(erlang:atom_to_list(Module)),
+    Module_binary = erlang:atom_to_binary(Module, latin1),
     Function_binary = erlang:list_to_binary(Function),
-    L_binary = line_binary(Line),
+    L_binary = erlang:integer_to_binary(Line),
     Message_binary = unicode:characters_to_binary(UserStr),
 
     <<Y_binary/binary, "-", Mo_binary/binary, "-",
@@ -58,62 +48,46 @@ default({{{Year, Month, Day}, {Hour, Minute, Second}, Millisecond},
 binary(Msg) ->
     term_to_binary(Msg).
 
-line_binary(N) -> erlang:list_to_binary(erlang:integer_to_list(N)).
+get_priority_short_prefix(1) -> <<"*** ERROR">>;
+get_priority_short_prefix(2) -> <<"W">>;
+get_priority_short_prefix(3) -> <<"I">>;
+get_priority_short_prefix(4) -> <<"T">>;
+get_priority_short_prefix(5) -> <<"D">>.
 
-get_priority_short_prefix(Priority) ->
-    case Priority of
-        1 ->   <<"*** ERROR">>;
-        2 -> <<"W">>;
-        3 ->    <<"I">>;
-        4 ->   <<"T">>;
-        5 ->   <<"D">>
-    end.
+get_priority_prefix_up(1) -> <<"ERROR">>;
+get_priority_prefix_up(2) -> <<"WARN ">>;
+get_priority_prefix_up(3) -> <<"INFO ">>;
+get_priority_prefix_up(4) -> <<"TRACE">>;
+get_priority_prefix_up(5) -> <<"DEBUG">>.
 
-get_priority_prefix_up(Priority) ->
-    case Priority of
-        1 ->   <<"ERROR">>;
-        2 -> <<"WARN ">>;
-        3 ->    <<"INFO ">>;
-        4 ->   <<"TRACE">>;
-        5 ->   <<"DEBUG">>
-    end.
-
-get_priority_prefix_low(Priority) ->
-    case Priority of
-        1 ->   <<"error">>;
-        2 -> <<"warning">>;
-        3 ->    <<"info">>;
-        4 ->   <<"trace">>;
-        5 ->   <<"debug">>
-    end.
+get_priority_prefix_low(1) -> <<"error">>;
+get_priority_prefix_low(2) -> <<"warning">>;
+get_priority_prefix_low(3) -> <<"info">>;
+get_priority_prefix_low(4) -> <<"trace">>;
+get_priority_prefix_low(5) -> <<"debug">>.
 
 msecond_binary(N) when N < 10 ->
-    Rez = erlang:list_to_binary(erlang:integer_to_list(N)),
-    <<"00000", Rez/binary>>;
+    <<"00000", (erlang:integer_to_binary(N))/binary>>;
 msecond_binary(N) when N < 100 ->
-    Rez = erlang:list_to_binary(erlang:integer_to_list(N)),
-    <<"0000", Rez/binary>>;
+    <<"0000", (erlang:integer_to_binary(N))/binary>>;
 msecond_binary(N) when N < 1000 ->
-    Rez = erlang:list_to_binary(erlang:integer_to_list(N)),
-    <<"000", Rez/binary>>;
+    <<"000", (erlang:integer_to_binary(N))/binary>>;
 msecond_binary(N) when N < 10000 ->
-    Rez = erlang:list_to_binary(erlang:integer_to_list(N)),
-    <<"00", Rez/binary>>;
+    <<"00", (erlang:integer_to_binary(N))/binary>>;
 msecond_binary(N) when N < 100000 ->
-    Rez = erlang:list_to_binary(erlang:integer_to_list(N)),
-    <<"0", Rez/binary>>;
-msecond_binary(N) -> erlang:list_to_binary(erlang:integer_to_list(N)).
+    <<"0", (erlang:integer_to_binary(N))/binary>>;
+msecond_binary(N) -> erlang:integer_to_binary(N).
 
-time(0) -> <<"00">>;
-time(1) -> <<"01">>;
-time(2) -> <<"02">>;
-time(3) -> <<"03">>;
-time(4) -> <<"04">>;
-time(5) -> <<"05">>;
-time(6) -> <<"06">>;
-time(7) -> <<"07">>;
-time(8) -> <<"08">>;
-time(9) -> <<"09">>;
+time(0)  -> <<"00">>;
+time(1)  -> <<"01">>;
+time(2)  -> <<"02">>;
+time(3)  -> <<"03">>;
+time(4)  -> <<"04">>;
+time(5)  -> <<"05">>;
+time(6)  -> <<"06">>;
+time(7)  -> <<"07">>;
+time(8)  -> <<"08">>;
+time(9)  -> <<"09">>;
 time(10) -> <<"10">>;
 time(11) -> <<"11">>;
 time(12) -> <<"12">>;
