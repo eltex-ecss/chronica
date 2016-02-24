@@ -214,6 +214,7 @@ handle_call(#initialize_sync{}, _Flows, State = #config_state{
         cache_timer = IsCacheTimerStarted}) ->
     ConfigHash = config_hash(Config),
     Cache = load_cache(CacheDir, ConfigHash),
+
     AppListToRegister = application:loaded_applications(),
     AddApplicationFun =
         fun({AppL, _, _}, {RAppsL, CacheL}) ->
@@ -223,8 +224,11 @@ handle_call(#initialize_sync{}, _Flows, State = #config_state{
     {NewRApps, NewCache} = lists:foldl(AddApplicationFun, {RApps, Cache}, AppListToRegister),
     NewIsCacheTimerStarted =
         case NewCache == Cache of
-            true  -> IsCacheTimerStarted;
-            false -> IsCacheTimerStarted orelse timer:send_after(?save_cache_timeout, save_cache), true
+            true  ->
+                IsCacheTimerStarted;
+            false ->
+                IsCacheTimerStarted orelse timer:send_after(?save_cache_timeout, save_cache),
+                true
         end,
     {reply, ok, State#config_state{registered_applications = NewRApps,
         cache = NewCache, config_hash = ConfigHash, cache_timer = NewIsCacheTimerStarted}};
@@ -895,7 +899,13 @@ load_config(State = #config_state{loaded_config = LoadedConfig = #chronica_confi
                 switch_off(),
                 ConfigHashForOff = config_hash(NewConfig),
                 CacheForOff = load_cache(CacheDir, ConfigHashForOff),
-                throw({ok, State#config_state{loaded_config = NewConfig, rules = [], flows = [], cache = CacheForOff, config_hash = ConfigHashForOff}})
+                throw({ok, State#config_state{
+                            loaded_config = NewConfig,
+                            rules = [],
+                            flows = [],
+                            cache = CacheForOff,
+                            config_hash = ConfigHashForOff
+                        }})
         end,
 
         case NewFormatsConfig of
@@ -934,15 +944,17 @@ load_config(State = #config_state{loaded_config = LoadedConfig = #chronica_confi
         Cache = load_cache(CacheDir, ConfigHash),
 
         ?INT_DBG("ADD ALL APPLICATIONS", []),
-
         {NewRegApps, NewCache} = add_all_applications(RegApps, NewRules, Cache, Detail_info, TickFun),
 
         erlang:garbage_collect(),
 
         NewIsCacheTimerStarted =
             case NewCache == Cache of
-                true  -> IsCacheTimerStarted;
-                false -> IsCacheTimerStarted orelse timer:send_after(?save_cache_timeout, save_cache), true
+                true ->
+                    IsCacheTimerStarted;
+                false ->
+                    IsCacheTimerStarted orelse timer:send_after(?save_cache_timeout, save_cache),
+                    true
             end,
 
         {ok, State#config_state{
@@ -1431,14 +1443,10 @@ generate_app_iface_modules(App, Rules) ->
         end, [], AppModules).
 
 generate_iface_module(ModuleName, Rules) ->
-    generate_iface_module(ModuleName, Rules, []).
-
-generate_iface_module(ModuleName, Rules, Tags) ->
     TagList =
         case (catch ModuleName:get_log_tags()) of
-            Tags2 when is_list(Tags2) ->
-                lists:usort(Tags ++ Tags2);
-            _ -> Tags
+            Tags when is_list(Tags) -> Tags;
+            _ -> []
         end,
 
     case TagList of
@@ -1464,7 +1472,7 @@ generate_iface_module(ModuleName, Rules, Tags) ->
             Clauses = generate_clauses(TagList, Flows) ++ [DefaultClause],
             AST2 = pt_lib:add_function(AST, ast("log_fast [...$Clauses...].", 0)),
 
-            DefaultClause2 = ast("(Tags, Priority) -> not_found.", 0),
+            DefaultClause2 = ast("([], Priority) -> not_found.", 0),
 
             Clauses2 = generate_clauses_for_get_flows(TagList, Flows) ++ [DefaultClause2],
             AST3 = pt_lib:add_function(AST2, ast("get_flows [...$Clauses2...].", 0)),
@@ -1626,7 +1634,21 @@ load_cache(CacheDir, ConfigHash) ->
     case file:read_file(Filename) of
         {ok, Binary} ->
             try
-                erlang:binary_to_term(Binary)
+                Cache = erlang:binary_to_term(Binary),
+                {BeamsCache, Cache1} =
+                    case Cache of
+                        [{beam_cache, Hash} | TailCache] ->
+                            {{beam_cache, Hash}, TailCache};
+                        _ ->
+                            {{beam_cache, undef}, Cache}
+                    end,
+                Cache2 =
+                    case BeamsCache == cache_beams() of
+                        true ->
+                            Cache1;
+                        false ->
+                            []
+                    end
             catch
                 _:_ ->
                     ?INT_ERR("Broken chronica cache in the file (~p)", [Filename]),
@@ -1638,10 +1660,31 @@ load_cache(CacheDir, ConfigHash) ->
             []
     end.
 
+cache_beams() ->
+    Dir = filename:dirname(code:which(chronica)),
+    Beams = filelib:wildcard(filename:join(Dir, "*.beam")),
+    VSNs = lists:foldl(
+        fun(Beam, Acc) ->
+            try
+                {ok, {_, [{attributes, Attr}]}} = beam_lib:chunks(Beam, [attributes]),
+                case proplists:get_value(vsn, Attr) of
+                    undefined -> Acc;
+                    [VSN] -> [VSN | Acc];
+                    _ -> Acc
+                end
+            catch
+                _:_ ->
+                    Acc
+            end
+        end, [], Beams),
+    Hash = erlang:phash2(VSNs, 999999),
+    {beam_cache, lists:flatten(io_lib:format("~6.10.0B", [Hash]))}.
+
 save_cache(_CacheDir, _ConfigHash, []) -> ok;
 save_cache(CacheDir, ConfigHash, Cache) ->
     Filename = cache_filename(CacheDir, ConfigHash),
-    Binary = erlang:term_to_binary(Cache),
+    CacheBeams = cache_beams(),
+    Binary = erlang:term_to_binary([CacheBeams | Cache]),
     Size = erlang:byte_size(Binary),
     ?INT_DBG("Save chronica cache (~b bytes) to ~p", [Size, Filename]),
     case file:write_file(Filename, Binary) of
@@ -1713,7 +1756,7 @@ bin2hex(Hex) when is_list(Hex) ->
 -define(d2012_11_16_1_25_41, 63520248341000000).
 
 generate_name(Prefix) ->
-    Now = {_, _, M} = now(),
+    Now = {_, _, M} = os:timestamp(),
     DT = calendar:now_to_universal_time(Now),
     N = calendar:datetime_to_gregorian_seconds(DT) * 1000000 + M - ?d2012_11_16_1_25_41,
 
