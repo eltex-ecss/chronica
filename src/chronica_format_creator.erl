@@ -39,218 +39,270 @@ reload_formats(FList, Module) ->
                 FList)
         end).
 
-create_format_function(
-                       FunName, UserFormat, #chronica_coloring{colored = Colored,
-                                                               formats_name = NameFormats,
-                                                               colors_spec = ColorsSpec}
-                      ) ->
+create_format_function(FunName, UserFormat,
+        #chronica_coloring{colored = Colored,
+                           formats_name = NameFormats,
+                           colors_spec = ColorsSpec}) ->
     ?INT_DBG("create_format_function ~p ~s", [FunName, UserFormat]),
 
     {ListFUM_rev, _Mode} = run(UserFormat, [{[], []}], undef, fun (Other) -> Other end),
     ListFUM = lists:reverse(ListFUM_rev),
             ?INT_DBG("~p~n~n", [ListFUM]),
-            FunArgs =
-                fun({_, Args_c}, Acc) ->
+            FunArgs = fun({_, Args_c}, Acc) ->
                     Acc ++ Args_c
                 end,
     Args = lists:foldl(FunArgs, [], ListFUM),
-    case Colored of
+    {BinaryStr, FormattingStr} = case Colored of
         true ->
             case lists:keyfind(FunName, 2, NameFormats) of
                 {_FormatId, FunName} ->
                     ColorsData = update_colors_data(ColorsSpec, #chronica_colors_data{}),
                     FunColor = fun ({Data, Str}) -> coloring_str(Str, get_color_colors_data(ColorsData, Data)) end,
-                    {BinaryStr, FormattingStr} = make_format_function_ast(Args, "<<", "~p({{{Year,Month,Day},{Hour,Minute,Second},Millisecond}, PriorityInt, Module, Pid, Line, File, Function, UserStr}) -> " ++ priority_color(FunColor), FunColor, true),
-                    true;
+                    make_format_function_ast(Args, "<<", "~p({{{Year,Month,Day},{Hour,Minute,Second},Millisecond}, PriorityInt, Module, Pid, Line, File, Function, UserStr}) -> " ++ priority_color(FunColor), FunColor, true);
                 false ->
-                    {BinaryStr, FormattingStr} = make_format_function_ast(Args, "<<", "~p({{{Year,Month,Day},{Hour,Minute,Second},Millisecond}, PriorityInt, Module, Pid, Line, File, Function, UserStr}) -> ", fun ({_Data, Str}) -> Str end, false)
+                    make_format_function_ast(Args, "<<", "~p({{{Year,Month,Day},{Hour,Minute,Second},Millisecond}, PriorityInt, Module, Pid, Line, File, Function, UserStr}) -> ", fun ({_Data, Str}) -> Str end, false)
             end;
         false ->
-            {BinaryStr, FormattingStr} = make_format_function_ast(Args, "<<", "~p({{{Year,Month,Day},{Hour,Minute,Second},Millisecond}, PriorityInt, Module, Pid, Line, File, Function, UserStr}) -> ", fun ({_Data, Str}) -> Str end, false)
+            make_format_function_ast(Args, "<<", "~p({{{Year,Month,Day},{Hour,Minute,Second},Millisecond}, PriorityInt, Module, Pid, Line, File, Function, UserStr}) -> ", fun ({_Data, Str}) -> Str end, false)
     end,
     ?INT_DBG("BinaryStr: ~p~n~n", [lists:flatten(BinaryStr)]),
     FunctionStr = FormattingStr ++ BinaryStr,
-    [AstStr] = pt_lib:str2ast(io_lib:format(FunctionStr, [FunName]), 0),
-    AstStr.
+    ?INT_DBG("BinaryStr: ~s~n~n", [FunctionStr]),
+    hd(pt_lib:str2ast(io_lib:format(FunctionStr, [FunName]), 0)).
 
 priority_color(FunColor) ->
-    "Get_priority_short_prefix = fun(Priority) ->
-        case Priority of
-            1 -> <<" ++ FunColor({'Error', "\"*** ERROR\""}) ++ ">>;
-            2 -> <<" ++ FunColor({'Warning', "\"W\""}) ++ ">>;
-            3 -> <<" ++ FunColor({'Info', "\"I\""}) ++ ">>;
-            4 -> <<" ++ FunColor({'Trace', "\"T\""}) ++ ">>;
-            5 -> <<" ++ FunColor({'Debug', "\"D\""}) ++ ">> end end,
+    "Get_priority_short_prefix =
+        fun(1) -> <<" ++ FunColor({'Error', "\"*** ERROR\""}) ++ ">>;
+           (2) -> <<" ++ FunColor({'Warning', "\"W\""}) ++ ">>;
+           (3) -> <<" ++ FunColor({'Info', "\"I\""}) ++ ">>;
+           (4) -> <<" ++ FunColor({'Trace', "\"T\""}) ++ ">>;
+           (5) -> <<" ++ FunColor({'Debug', "\"D\""}) ++ ">> end,
 
-    Get_priority_prefix_up = fun(Priority) ->
-        case Priority of
-            1 -> <<" ++ FunColor({'Error', "\"ERROR\""}) ++ ">>;
-            2 -> <<" ++ FunColor({'Warning', "\"WARN \""}) ++ ">>;
-            3 -> <<" ++ FunColor({'Info', "\"INFO \""}) ++ ">>;
-            4 -> <<" ++ FunColor({'Trace', "\"TRACE\""}) ++ ">>;
-            5 -> <<" ++ FunColor({'Debug', "\"DEBUG\""}) ++ ">> end end,
+    Get_priority_prefix_up =
+        fun(1) -> <<" ++ FunColor({'Error', "\"ERROR\""}) ++ ">>;
+           (2) -> <<" ++ FunColor({'Warning', "\"WARN \""}) ++ ">>;
+           (3) -> <<" ++ FunColor({'Info', "\"INFO \""}) ++ ">>;
+           (4) -> <<" ++ FunColor({'Trace', "\"TRACE\""}) ++ ">>;
+           (5) -> <<" ++ FunColor({'Debug', "\"DEBUG\""}) ++ ">> end,
 
-    Get_priority_prefix_low = fun(Priority) ->
-        case Priority of
-            1 -> <<" ++ FunColor({'Error', "\"error\""}) ++ ">>;
-            2 -> <<" ++ FunColor({'Warning', "\"warning\""}) ++ ">>;
-            3 -> <<" ++ FunColor({'Info', "\"info\""}) ++ ">>;
-            4 -> <<" ++ FunColor({'Trace', "\"trace\""}) ++ ">>;
-            5 -> <<" ++ FunColor({'Debug', "\"debug\""}) ++ ">> end end, ".
+    Get_priority_prefix_low =
+        fun(1) -> <<" ++ FunColor({'Error', "\"error\""}) ++ ">>;
+           (2) -> <<" ++ FunColor({'Warning', "\"warning\""}) ++ ">>;
+           (3) -> <<" ++ FunColor({'Info', "\"info\""}) ++ ">>;
+           (4) -> <<" ++ FunColor({'Trace', "\"trace\""}) ++ ">>;
+           (5) -> <<" ++ FunColor({'Debug', "\"debug\""}) ++ ">> end, ".
 
 make_format_function_ast([], BinaryStr, StrAST, _FunColor, _FlagColor) ->
     {BinaryStr ++ ">>.", StrAST};
+make_format_function_ast([Args = 'Year'| Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Y_binary/binary"}),
+    NewStrAST = "Y_binary = year_binary(Year), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Month' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Mo_binary/binary"}),
+    NewStrAST = "Mo_binary = time(Month), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Month_string' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "String_Mo_binary/binary"}),
+    NewStrAST = "String_Mo_binary = month_str_binary(Month), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Day' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "D_binary/binary"}),
+    NewStrAST = "D_binary = time(Day), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Hour' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "H_binary/binary"}),
+    NewStrAST = "H_binary = time(Hour), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Minute' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Minute_binary/binary"}),
+    NewStrAST = "Minute_binary = time(Minute), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Second' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Second_binary/binary"}),
+    NewStrAST = "Second_binary = time(Second), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Millisecond' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "MilliSecond_binary/binary"}),
+    NewStrAST = "MilliSecond_binary = msecond_binary(Millisecond), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Priority_cap' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Priority_cap_binary/binary"}),
+    NewStrAST = case FlagColor of
+        true ->
+            "Priority_cap_binary = Get_priority_prefix_up(PriorityInt), ";
+        false ->
+            "Priority_cap_binary = get_priority_prefix_up(PriorityInt), "
+    end,
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Priority_short' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Priority_short_binary/binary"}),
+    NewStrAST = case FlagColor of
+        true ->
+            "Priority_short_binary = Get_priority_short_prefix(PriorityInt), ";
+        false ->
+            "Priority_short_binary = get_priority_short_prefix(PriorityInt), "
+    end,
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Priority' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Priority_binary/binary"}),
+    NewStrAST = case FlagColor of
+        true ->
+            "Priority_binary = Get_priority_prefix_low(PriorityInt), ";
+        false ->
+            "Priority_binary = get_priority_prefix_low(PriorityInt), "
+    end,
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Pid' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Pid_binary/binary"}),
+    NewStrAST = "Pid_binary = erlang:list_to_binary(erlang:pid_to_list(Pid)), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'File' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "File_binary/binary"}),
+    NewStrAST = "File_binary = erlang:list_to_binary(File), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Line' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "L_binary/binary"}),
+    NewStrAST = "L_binary = erlang:integer_to_binary(Line), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Module' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Module_binary/binary"}),
+    NewStrAST = "Module_binary = erlang:list_to_binary(erlang:atom_to_list(Module)), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'Function' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Function_binary/binary"}),
+    NewStrAST = "Function_binary = erlang:list_to_binary(Function), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'UserStr' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "Message_binary/binary"}),
+    NewStrAST = "Message_binary = unicode:characters_to_binary(UserStr), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
+make_format_function_ast([Args = 'UserStrLine' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
+    NewBinaryStr = FunColor({Args, "MessageLine_binary/binary"}),
+    NewStrAST = "MessageLine_binary = unicode:characters_to_binary(UserStr), ",
+    make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ ", \"\\n\"" ++ theend(Res),
+                             StrAST ++ NewStrAST, FunColor, FlagColor);
 make_format_function_ast([Args | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
-    case Args of
-        'Year' ->
-            NewBinaryStr = FunColor({Args, "Y_binary/binary"}),
-            NewStrAST = "Y_binary = year_binary(Year), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Month' ->
-            NewBinaryStr = FunColor({Args, "Mo_binary/binary"}),
-            NewStrAST = "Mo_binary = time(Month), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Month_string' ->
-            NewBinaryStr = FunColor({Args, "String_Mo_binary/binary"}),
-            NewStrAST = "String_Mo_binary = month_str_binary(Month), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Day' ->
-            NewBinaryStr = FunColor({Args, "D_binary/binary"}),
-            NewStrAST = "D_binary = time(Day), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Hour' ->
-            NewBinaryStr = FunColor({Args, "H_binary/binary"}),
-            NewStrAST = "H_binary = time(Hour), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Minute' ->
-            NewBinaryStr = FunColor({Args, "Minute_binary/binary"}),
-            NewStrAST = "Minute_binary = time(Minute), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Second' ->
-            NewBinaryStr = FunColor({Args, "Second_binary/binary"}),
-            NewStrAST = "Second_binary = time(Second), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Millisecond' ->
-            NewBinaryStr = FunColor({Args, "MilliSecond_binary/binary"}),
-            NewStrAST = "MilliSecond_binary = msecond_binary(Millisecond), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Priority_cap' ->
-            NewBinaryStr = FunColor({Args, "Priority_cap_binary/binary"}),
-            NewStrAST = case FlagColor of
-                            true ->
-                                "Priority_cap_binary = Get_priority_prefix_up(PriorityInt), ";
-                            false ->
-                                "Priority_cap_binary = get_priority_prefix_up(PriorityInt), "
-                        end,
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Priority_short' ->
-            NewBinaryStr = FunColor({Args, "Priority_short_binary/binary"}),
-            NewStrAST = case FlagColor of
-                            true ->
-                                "Priority_short_binary = Get_priority_short_prefix(PriorityInt), ";
-                            false ->
-                                "Priority_short_binary = get_priority_short_prefix(PriorityInt), "
-                        end,
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Priority' ->
-            NewBinaryStr = FunColor({Args, "Priority_binary/binary"}),
-            NewStrAST = case FlagColor of
-                            true ->
-                                "Priority_binary = Get_priority_prefix_low(PriorityInt), ";
-                            false ->
-                                "Priority_binary = get_priority_prefix_low(PriorityInt), "
-                        end,
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Pid' ->
-            NewBinaryStr = FunColor({Args, "Pid_binary/binary"}),
-            NewStrAST = "Pid_binary = erlang:list_to_binary(erlang:pid_to_list(Pid)), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'File' ->
-            NewBinaryStr = FunColor({Args, "File_binary/binary"}),
-            NewStrAST = "File_binary = erlang:list_to_binary(File), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Line' ->
-            NewBinaryStr = FunColor({Args, "L_binary/binary"}),
-            NewStrAST = "L_binary = line_binary(Line), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Module' ->
-            NewBinaryStr = FunColor({Args, "Module_binary/binary"}),
-            NewStrAST = "Module_binary = erlang:list_to_binary(erlang:atom_to_list(Module)), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'Function' ->
-            NewBinaryStr = FunColor({Args, "Function_binary/binary"}),
-            NewStrAST = "Function_binary = erlang:list_to_binary(Function), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'UserStr' ->
-            NewBinaryStr = FunColor({Args, "Message_binary/binary"}),
-            NewStrAST = "Message_binary = unicode:characters_to_binary(UserStr), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        'UserStrLine' ->
-            NewBinaryStr = FunColor({Args, "MessageLine_binary/binary"}),
-            NewStrAST = "MessageLine_binary = unicode:characters_to_binary(UserStr), ",
-            make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ ", \"\\n\"" ++ theend(Res), StrAST ++ NewStrAST, FunColor, FlagColor);
-        _ ->
-            make_format_function_ast(Res, BinaryStr ++ io_lib:format("~p",[[Args]]) ++ theend(Res), StrAST, FunColor, FlagColor)
-    end.
+    make_format_function_ast(Res, BinaryStr ++ io_lib:format("~p",[[Args]]) ++ theend(Res),
+                             StrAST, FunColor, FlagColor).
 
 theend([]) -> "";
 theend(_) -> ", ".
 
-set_color_colors_data(#chronica_colors_data{} = ColoringData, Data, Color) ->
-    case Data of
-        'Year'          -> ColoringData#chronica_colors_data{year_color = Color};
-        'Month'         -> ColoringData#chronica_colors_data{month_color = Color};
-        'Month_string'  -> ColoringData#chronica_colors_data{month_string_color = Color};
-        'Day'           -> ColoringData#chronica_colors_data{day_color = Color};
-        'Hour'          -> ColoringData#chronica_colors_data{hour_color = Color};
-        'Minute'        -> ColoringData#chronica_colors_data{minute_color = Color};
-        'Second'        -> ColoringData#chronica_colors_data{second_color = Color};
-        'Millisecond'   -> ColoringData#chronica_colors_data{millisecond_color = Color};
-        'Pid'           -> ColoringData#chronica_colors_data{pid_color = Color};
-        'File'          -> ColoringData#chronica_colors_data{file_color = Color};
-        'Line'          -> ColoringData#chronica_colors_data{line_color = Color};
-        'Module'        -> ColoringData#chronica_colors_data{module_color = Color};
-        'Function'      -> ColoringData#chronica_colors_data{function_color = Color};
-        'UserStr'       -> ColoringData#chronica_colors_data{user_str_color = Color};
-        'UserStrLine'   -> ColoringData#chronica_colors_data{user_str_line_color = Color};
-        'Error'         -> ColoringData#chronica_colors_data{error_color = Color};
-        'Warning'       -> ColoringData#chronica_colors_data{warning_color = Color};
-        'Info'          -> ColoringData#chronica_colors_data{info_color = Color};
-        'Debug'         -> ColoringData#chronica_colors_data{debug_color = Color};
-        'Trace'         -> ColoringData#chronica_colors_data{trace_color = Color};
-        'Priority_cap'  -> throw({not_apply_colot_to, Data});
-        'Priority_short'-> throw({not_apply_colot_to, Data});
-        'Priority'      -> throw({not_apply_colot_to, Data});
-        _               -> throw({undefined_color_data, Data})
-    end.
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Year', Color) ->
+    ColoringData#chronica_colors_data{year_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Month', Color) ->
+    ColoringData#chronica_colors_data{month_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Month_string', Color) ->
+    ColoringData#chronica_colors_data{month_string_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Day', Color) ->
+    ColoringData#chronica_colors_data{day_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Hour', Color) ->
+    ColoringData#chronica_colors_data{hour_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Minute', Color) ->
+    ColoringData#chronica_colors_data{minute_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Second', Color) ->
+    ColoringData#chronica_colors_data{second_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Millisecond', Color) ->
+    ColoringData#chronica_colors_data{millisecond_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Pid', Color) ->
+    ColoringData#chronica_colors_data{pid_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'File', Color) ->
+    ColoringData#chronica_colors_data{file_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Line', Color) ->
+    ColoringData#chronica_colors_data{line_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Module', Color) ->
+    ColoringData#chronica_colors_data{module_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Function', Color) ->
+    ColoringData#chronica_colors_data{function_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'UserStr', Color) ->
+    ColoringData#chronica_colors_data{user_str_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'UserStrLine', Color) ->
+    ColoringData#chronica_colors_data{user_str_line_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Error', Color) ->
+    ColoringData#chronica_colors_data{error_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Warning', Color) ->
+    ColoringData#chronica_colors_data{warning_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Info', Color) ->
+    ColoringData#chronica_colors_data{info_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Debug', Color) ->
+    ColoringData#chronica_colors_data{debug_color = Color};
+set_color_colors_data(#chronica_colors_data{} = ColoringData, 'Trace', Color) ->
+    ColoringData#chronica_colors_data{trace_color = Color};
+set_color_colors_data(#chronica_colors_data{}, Data = 'Priority_cap', _Color) ->
+    throw({not_apply_colot_to, Data});
+set_color_colors_data(#chronica_colors_data{}, Data = 'Priority_short', _Color) ->
+    throw({not_apply_colot_to, Data});
+set_color_colors_data(#chronica_colors_data{}, Data = 'Priority', _Color) ->
+    throw({not_apply_colot_to, Data});
+set_color_colors_data(#chronica_colors_data{}, Data, _Color) ->
+    throw({undefined_color_data, Data}).
 
-get_color_colors_data(#chronica_colors_data{} = ColoringData, Data) ->
-    case Data of
-        'Year'          -> ColoringData#chronica_colors_data.year_color;
-        'Month'         -> ColoringData#chronica_colors_data.month_color;
-        'Month_string'  -> ColoringData#chronica_colors_data.month_string_color;
-        'Day'           -> ColoringData#chronica_colors_data.day_color;
-        'Hour'          -> ColoringData#chronica_colors_data.hour_color;
-        'Minute'        -> ColoringData#chronica_colors_data.minute_color;
-        'Second'        -> ColoringData#chronica_colors_data.second_color;
-        'Millisecond'   -> ColoringData#chronica_colors_data.millisecond_color;
-        'Priority_cap'  -> ColoringData#chronica_colors_data.priority_cap_color;
-        'Priority_short'-> ColoringData#chronica_colors_data.priority_short_color;
-        'Priority'      -> ColoringData#chronica_colors_data.priority_color;
-        'Pid'           -> ColoringData#chronica_colors_data.pid_color;
-        'File'          -> ColoringData#chronica_colors_data.file_color;
-        'Line'          -> ColoringData#chronica_colors_data.line_color;
-        'Module'        -> ColoringData#chronica_colors_data.module_color;
-        'Function'      -> ColoringData#chronica_colors_data.function_color;
-        'UserStr'       -> ColoringData#chronica_colors_data.user_str_color;
-        'UserStrLine'   -> ColoringData#chronica_colors_data.user_str_line_color;
-        'Error'         -> ColoringData#chronica_colors_data.error_color;
-        'Warning'       -> ColoringData#chronica_colors_data.warning_color;
-        'Info'          -> ColoringData#chronica_colors_data.info_color;
-        'Debug'         -> ColoringData#chronica_colors_data.debug_color;
-        'Trace'         -> ColoringData#chronica_colors_data.trace_color;
-        _               -> throw({undefined_colors_data, Data})
-    end.
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Year') ->
+    ColoringData#chronica_colors_data.year_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Month') ->
+    ColoringData#chronica_colors_data.month_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Month_string') ->
+    ColoringData#chronica_colors_data.month_string_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Day') ->
+    ColoringData#chronica_colors_data.day_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Hour') ->
+    ColoringData#chronica_colors_data.hour_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Minute') ->
+    ColoringData#chronica_colors_data.minute_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Second') ->
+    ColoringData#chronica_colors_data.second_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Millisecond') ->
+    ColoringData#chronica_colors_data.millisecond_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Priority_cap') ->
+    ColoringData#chronica_colors_data.priority_cap_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Priority_short') ->
+    ColoringData#chronica_colors_data.priority_short_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Priority') ->
+    ColoringData#chronica_colors_data.priority_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Pid') ->
+    ColoringData#chronica_colors_data.pid_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'File') ->
+    ColoringData#chronica_colors_data.file_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Line') ->
+    ColoringData#chronica_colors_data.line_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Module') ->
+    ColoringData#chronica_colors_data.module_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Function') ->
+    ColoringData#chronica_colors_data.function_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'UserStr') ->
+    ColoringData#chronica_colors_data.user_str_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'UserStrLine') ->
+    ColoringData#chronica_colors_data.user_str_line_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Error') ->
+    ColoringData#chronica_colors_data.error_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Warning') ->
+    ColoringData#chronica_colors_data.warning_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Info') ->
+    ColoringData#chronica_colors_data.info_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Debug') ->
+    ColoringData#chronica_colors_data.debug_color;
+get_color_colors_data(#chronica_colors_data{} = ColoringData, 'Trace') ->
+    ColoringData#chronica_colors_data.trace_color;
+get_color_colors_data(#chronica_colors_data{}, Data) ->
+    throw({undefined_colors_data, Data}).
 
 get_color([], Acc) -> Acc;
 get_color([{foreground, Color} | Tail], Acc) ->
@@ -264,51 +316,39 @@ get_color([Head | _Tail], _Acc) ->
 get_color(ColorsSpec, _Acc) ->
     throw({invalid_colors_spec, ColorsSpec}).
 
-concat_color(Str1, Str2) ->
-    case Str2 of
-        []                  -> Str1;
-        ?DEFAULT_COLOR_CODE -> Str1;
-        _                   ->
-            case Str1 of
-                ?DEFAULT_COLOR_CODE -> Str2;
-                _ -> Str1 ++ ";" ++ Str2
-            end
-    end.
+concat_color(Str1, []) -> Str1;
+concat_color(Str1, ?DEFAULT_COLOR_CODE) -> Str1;
+concat_color(?DEFAULT_COLOR_CODE, Str2) -> Str2;
+concat_color(Str1, Str2) -> Str1 ++ ";" ++ Str2.
 
 get_bold(true)  -> ?BOLD_CODE;
 get_bold(false) -> ?DEFAULT_COLOR_CODE;
 get_bold(Other) ->
     throw({invalid_colors_spec, {invalid_bold, Other}}).
 
-get_foreground_color(Color) ->
-    case Color of
-        red       -> ?FOREGROUND_RED_CODE;
-        yellow    -> ?FOREGROUND_YELLOW_CODE;
-        blue      -> ?FOREGROUND_BLUE_CODE;
-        black     -> ?FOREGROUND_BLACK_CODE;
-        green     -> ?FOREGROUND_GREEN_CODE;
-        purple    -> ?FOREGROUND_PURPLE_CODE;
-        cyan      -> ?FOREGROUND_CYAN_CODE;
-        gray      -> ?FOREGROUND_GRAY_CODE;
-        white     -> ?FOREGROUND_WHITE_CODE;
-        default   -> ?DEFAULT_COLOR_CODE;
-        _         -> throw({undefined_color, Color})
-    end.
+get_foreground_color(red)     -> ?FOREGROUND_RED_CODE;
+get_foreground_color(yellow)  -> ?FOREGROUND_YELLOW_CODE;
+get_foreground_color(blue)    -> ?FOREGROUND_BLUE_CODE;
+get_foreground_color(black)   -> ?FOREGROUND_BLACK_CODE;
+get_foreground_color(green)   -> ?FOREGROUND_GREEN_CODE;
+get_foreground_color(purple)  -> ?FOREGROUND_PURPLE_CODE;
+get_foreground_color(cyan)    -> ?FOREGROUND_CYAN_CODE;
+get_foreground_color(gray)    -> ?FOREGROUND_GRAY_CODE;
+get_foreground_color(white)   -> ?FOREGROUND_WHITE_CODE;
+get_foreground_color(default) -> ?DEFAULT_COLOR_CODE;
+get_foreground_color(Color)   -> throw({undefined_color, Color}).
 
-get_background_color(Color) ->
-    case Color of
-        red       -> ?BACKGROUND_RED_CODE;
-        yellow    -> ?BACKGROUND_YELLOW_CODE;
-        blue      -> ?BACKGROUND_BLUE_CODE;
-        black     -> ?BACKGROUND_BLACK_CODE;
-        green     -> ?BACKGROUND_GREEN_CODE;
-        purple    -> ?BACKGROUND_PURPLE_CODE;
-        cyan      -> ?BACKGROUND_CYAN_CODE;
-        gray      -> ?BACKGROUND_GRAY_CODE;
-        white     -> ?BACKGROUND_WHITE_CODE;
-        default   -> ?DEFAULT_COLOR_CODE;
-        _         -> throw({undefined_color, Color})
-    end.
+get_background_color(red)     -> ?BACKGROUND_RED_CODE;
+get_background_color(yellow)  -> ?BACKGROUND_YELLOW_CODE;
+get_background_color(blue)    -> ?BACKGROUND_BLUE_CODE;
+get_background_color(black)   -> ?BACKGROUND_BLACK_CODE;
+get_background_color(green)   -> ?BACKGROUND_GREEN_CODE;
+get_background_color(purple)  -> ?BACKGROUND_PURPLE_CODE;
+get_background_color(cyan)    -> ?BACKGROUND_CYAN_CODE;
+get_background_color(gray)    -> ?BACKGROUND_GRAY_CODE;
+get_background_color(white)   -> ?BACKGROUND_WHITE_CODE;
+get_background_color(default) -> ?DEFAULT_COLOR_CODE;
+get_background_color(Color)   -> throw({undefined_color, Color}).
 
 %include colors_data and partitioned 'DataTime' to data and time
 update_colors_data([], #chronica_colors_data{} = Acc) -> Acc;
@@ -332,11 +372,9 @@ update_colors_data([Head | Tail], #chronica_colors_data{} = Acc) ->
         end,
     update_colors_data(Tail, NewAcc).
 
+coloring_str(Str, ?DEFAULT_COLOR_CODE) -> Str;
 coloring_str(Str, ColorCode) ->
-    case ColorCode of
-        ?DEFAULT_COLOR_CODE -> Str;
-        _ -> "\"\\e[" ++ ColorCode ++ "m\", " ++ Str ++ ", \"\\e[m\""
-    end.
+        "\"\\e[" ++ ColorCode ++ "m\", " ++ Str ++ ", \"\\e[m\"".
 
 insert_tab(F) -> insert_tab_(lists:flatten(F), []).
 
@@ -344,9 +382,9 @@ insert_tab_([], Res) -> lists:reverse(Res);
 insert_tab_([$%, $% | F], Res) ->
     {TabStr, Rest} = get_macro_name(F),
     try
-        lists:reverse(Res) ++ Rest
+        lists:reverse(Res, Rest)
     catch
-        _:_ -> insert_tab_(Rest, lists:reverse(TabStr) ++ [$%, $%, Res])
+        _:_ -> insert_tab_(Rest, lists:reverse(TabStr, [$%, $%, Res]))
     end;
 insert_tab_([C | F], Res) -> insert_tab_(F, [C | Res]).
 
