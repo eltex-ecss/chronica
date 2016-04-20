@@ -19,6 +19,8 @@
    [
     active/1,
     add_application/1,
+    add_rule/4,
+    add_rule/5,
     add_tcp_connection/5,
     clear_log/1,
     free_resources/0,
@@ -341,6 +343,17 @@ handle_call({update_rule_inwork, Id, InWork, TickFun}, _From,
                 {stop, Reason} -> {stop, Reason, {error, Reason}, State};
                 Err -> {stop, Err, State}
             end
+    end;
+
+handle_call({add_rule, NameRule, Mask, Priority, Flow, TickFun}, _From,
+            State = #config_state{loaded_config = Config = #chronica_config{rules = Rules}}) ->
+    NewRule = #chronica_rule{id = NameRule, mask = Mask,
+                priority = Priority, flow_ids = [Flow], in_work = true},
+    case catch true_load_config(State, Config#chronica_config{rules = [NewRule|Rules]}, TickFun) of
+        {ok, NewState} -> {reply, ok, NewState};
+        {error, NewState, Reason} -> {reply, {error, Reason}, NewState};
+        {stop, Reason} -> {stop, Reason, {error, Reason}, State};
+        Err -> {stop, Err, State}
     end;
 
 handle_call(get_module_num, _From, State = #config_state{registered_applications = RegApps}) ->
@@ -981,7 +994,6 @@ get_all_flows(Rules) ->
         ],
     lists:usort(FlowHandlesDublicated).
 
-
 get_config() ->
     gen_server:call(?MODULE, get_config).
 
@@ -1006,6 +1018,16 @@ free_resources() ->
     gen_server:call(?MODULE, free_resources).
 add_application(App) ->
     gen_server:call(?MODULE, {add_application, App}, infinity).
+
+-spec add_rule(NameRule :: atom(), Mask :: nonempty_string(),
+    Priority :: chronica_priority(), Flow :: atom()) -> ok | {error, _Reason}.
+add_rule(NameRule, Mask, Priority, Flow) when is_atom(NameRule) ->
+    add_rule(NameRule, Mask, Priority, Flow, fun() -> ok end).
+
+-spec add_rule(NameRule :: atom(), Mask :: nonempty_string(),
+    Priority :: chronica_priority(), Flow :: atom(), Fun :: fun(() -> any())) -> ok | {error, _Reason}.
+add_rule(NameRule, Mask, Priority, Flow, Fun) when is_atom(NameRule) ->
+    gen_server:call(?MODULE, {add_rule, NameRule, Mask, Priority, Flow, Fun}, infinity).
 
 test_add_module(Module) ->
     gen_server:call(?MODULE, {test_add_module, Module}).

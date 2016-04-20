@@ -3,8 +3,8 @@
 </p>
 
 ##Общее представление
-Chronica это специальный фреймворк используемый для логирования сообщений в Erlang. 
-Он осуществляет более простой способ введения журналов в Erlang-приложениях. 
+Chronica это специальный фреймворк используемый для логирования сообщений в Erlang.
+Он осуществляет более простой способ введения журналов в Erlang-приложениях.
 
 ##Особенности
 * [Быстрее, легче, гибче!](https://docs.google.com/document/d/1S4-Yf799d5SDCWhr78Fsm6-EY98gd1BRW-Qffaynzsc/edit?usp=sharing)
@@ -26,7 +26,7 @@ Chronica это специальный фреймворк используемы
 * Быстрый старт приложения при повторном запуске на узле
 
 ##Использование
-Для того, чтобы добавить Chronica в ваше приложение достаточно добавить её как 
+Для того, чтобы добавить Chronica в ваше приложение достаточно добавить её как
 Erlang зависимость (в app файле), а также выставить опции компиляции:
 ```erlang
 {parse_transform, pt_chronica}
@@ -68,13 +68,13 @@ LEVEL(Format, Args)
 ```
 
 ## Теги
-Тегирование в Chronica позволяет создать группы уникальных логов, 
-которые будут писаться в определенный backend для того чтобы была возможность 
+Тегирование в Chronica позволяет создать группы уникальных логов,
+которые будут писаться в определенный backend для того чтобы была возможность
 быстро найти нужные сообщения.
 Cуществуют:
 
 * Пользовательские теги:
-    * Явные теги 
+    * Явные теги
     ```erlang
     log:error([my_teg], “test”).
     ```
@@ -102,12 +102,12 @@ Cуществуют:
 Из-за того, что в Chronica вычисление аргументов при вызове фунции логирования
 происходит внутри логера, вызов:
 ```erlang
-log:Level("~p", [erlang:get_stacktrace()]) 
+log:Level("~p", [erlang:get_stacktrace()])
 
-для корректного вывода стека вызовов в логи преобразуется в 
+для корректного вывода стека вызовов в логи преобразуется в
 
-begin 
-    Chronica_stacktrace_line = erlang:get_stacktrace(), 
+begin
+    Chronica_stacktrace_line = erlang:get_stacktrace(),
     log:Level("~p", [Chronica_stacktrace_line]).
 end
 ```
@@ -164,7 +164,7 @@ debug), список Flow (потоков)  в которыe будет прои
 
 Пример:
 ```erlang
-{warning_file_example1,      “*”,    warning,    [warning_file], off}, 
+{warning_file_example1,      “*”,    warning,    [warning_file], off},
 ```
 данное правило будет проигнорировано
 
@@ -176,7 +176,7 @@ mysql, но не mysql_ag.
 
 ```erlang
 {warning_file_example2,      “my_tag”,    warning,    [warning_file], on},
-данное правило выполнит все логи уровня warning или ниже, если у них 
+данное правило выполнит все логи уровня warning или ниже, если у них
 присутствует тег “my_tag”
 ```
 
@@ -204,7 +204,7 @@ Flows - это именованные потоки, которые пишут д
 ```erlang
 {formats,{ [ {default, “строка вывода”} ] }
 ```
-Это переопределит стандартный способ вывода информации, для всех flows указанных 
+Это переопределит стандартный способ вывода информации, для всех flows указанных
 без переопределенного заголовка из поля format.
 ```erlang
 default по умолчанию
@@ -228,6 +228,10 @@ Out:
 
 * chronica_manager:add_application(App)
 Регистрирует application во время работы Chronica.
+
+* chronica_manager:add_rule(Rule, Regexp, Level, Flow)
+* chronica_manager:add_rule(Rule, Regexp, Level, Flow, Fun)
+Добавляет новое правило во время работы Chronica и активирует его.
 
 <p align="center">
 <img src="https://github.com/eltex-ecss/chronica/blob/master/doc/logo_eltex.jpg"/>
