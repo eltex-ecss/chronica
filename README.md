@@ -202,6 +202,11 @@ Toggle "name_rule" rule on the fly.
 
 Add new application in list logging application
 
+* chronica_manager:add_rule(Rule, Regexp, Level, Flow)
+* chronica_manager:add_rule(Rule, Regexp, Level, Flow, Fun)
+
+Add new rule in list logging rule and activates
+
 <p align="center">
 <img src="https://github.com/eltex-ecss/chronica/blob/master/doc/logo_eltex.jpg"/>
 </p>

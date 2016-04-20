@@ -71,6 +71,10 @@ validate_rules2([#chronica_rule{id = Id, mask = M, priority = P, flow_ids = Fs, 
     catch
         throw:E -> throw({bad_rule, {Id, E}})
     end,
+    case is_atom(Id) of
+        true -> ok;
+        false -> throw({bad_rule_id, Id})
+    end,
     case lists:member(Id, RuleList) of
         true -> throw({doubling_rules, Id});
         false -> ok
