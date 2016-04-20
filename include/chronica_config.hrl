@@ -7,6 +7,7 @@
 %%%-------------------------------------------------------------------
 -include("chronica_color.hrl").
 -type chronica_flow_id() :: atom().
+-type chronica_priority() :: debug | trace | info | warning | error | nothing.
 
 -record(chronica_rule,
         {
