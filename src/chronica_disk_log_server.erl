@@ -300,14 +300,12 @@ do_close(Pid) ->
     end.
 
 erase_log(Name, Pid) ->
-    case get_local_pid(Name) of
+    case take_local_pid(Name) of
         undefined ->
             ok;
         {local, Pid} ->
-            true = ets:delete(?DISK_LOG_NAME_TABLE, Name),
             true = ets:delete(?DISK_LOG_PID_TABLE, Pid);
         {distributed, Pid} ->
-            true = ets:delete(?DISK_LOG_NAME_TABLE, Name),
             true = ets:delete(?DISK_LOG_PID_TABLE, Pid),
             ok = pg2:leave(?group(Name), Pid)
     end,
@@ -321,6 +319,16 @@ do_accessible_logs() ->
     Groups = ordsets:to_list(ordsets:subtract(Groups0, Local)),
     Dist = [L || L <- Groups, dist_pids(L) =/= []],
     {Local, Dist}.
+
+take_local_pid(LogName) ->
+    case ets:take(?DISK_LOG_NAME_TABLE, LogName) of
+        [{LogName, Pid, local}] ->
+            {local, Pid};
+            [{LogName, Pid, distr}] ->
+                {distributed, Pid};
+        [] ->
+                undefined
+    end.
 
 get_local_pid(LogName) ->
     case ets:lookup(?DISK_LOG_NAME_TABLE, LogName) of
