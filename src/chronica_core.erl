@@ -30,7 +30,7 @@ unwrap_param(Param) ->
     Param.
 
 sync_fast_log({fast_log_message, Priority, Format, Args, ModuleName, Line, File, Function, undefined, undefined, IfaceModule, Key}) ->
-    sync_fast_log({fast_log_message, Priority, Format, Args, ModuleName, Line, File, Function, self(), os:timestamp(), IfaceModule, Key});
+    sync_fast_log({fast_log_message, Priority, Format, Args, ModuleName, Line, File, Function, self(), erlang:timestamp(), IfaceModule, Key});
 
 sync_fast_log({fast_log_message, Priority, Format, Args, ModuleName, Line, File, Function, Pid, NowTime, IfaceModule, Key} = Msg) ->
     try

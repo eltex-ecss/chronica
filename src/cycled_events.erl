@@ -37,7 +37,7 @@ start_link(Name, MaxEvents) ->
     gen_server:start_link({local, Name}, ?MODULE, [MaxEvents], []).
 
 add_event(Buffer, Event) ->
-    gen_server:cast(Buffer, {add_event, {os:timestamp(), Event}}).
+    gen_server:cast(Buffer, {add_event, {erlang:timestamp(), Event}}).
 
 get_events(Buffer) ->
     gen_server:call(Buffer, {get_events, -1}).
