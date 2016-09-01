@@ -32,7 +32,7 @@ start() ->
 start(Priority, Mask, FormatLog, ListManualStartApp) ->
     [ application:load(App) || App <- ListManualStartApp ],
     {ok, _} = application:ensure_all_started(chronica),
-    Now = os:timestamp(),
+    Now = erlang:timestamp(),
     Config = #chronica_config{
                 rules =
                 [

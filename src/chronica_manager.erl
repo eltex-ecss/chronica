@@ -1438,7 +1438,7 @@ add_application_in_cache(App, RApps, Rules, Cache, Detail_info, TickFun) ->
 
 -spec get_timestamp() -> integer().
 get_timestamp() ->
-    {Mega, Sec, Micro} = os:timestamp(),
+    {Mega, Sec, Micro} = erlang:timestamp(),
     (Mega * 1000000 + Sec) * 1000 + round(Micro / 1000).
 %%++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -1664,13 +1664,12 @@ load_cache(CacheDir, ConfigHash) ->
                         _ ->
                             {{beam_cache, undef}, Cache}
                     end,
-                Cache2 =
-                    case BeamsCache == cache_beams() of
-                        true ->
-                            Cache1;
-                        false ->
-                            []
-                    end
+                case BeamsCache == cache_beams() of
+                    true ->
+                        Cache1;
+                    false ->
+                        []
+                end
             catch
                 _:_ ->
                     ?INT_ERR("Broken chronica cache in the file (~p)", [Filename]),
@@ -1778,7 +1777,7 @@ bin2hex(Hex) when is_list(Hex) ->
 -define(d2012_11_16_1_25_41, 63520248341000000).
 
 generate_name(Prefix) ->
-    Now = {_, _, M} = os:timestamp(),
+    Now = {_, _, M} = erlang:timestamp(),
     DT = calendar:now_to_universal_time(Now),
     N = calendar:datetime_to_gregorian_seconds(DT) * 1000000 + M - ?d2012_11_16_1_25_41,
 

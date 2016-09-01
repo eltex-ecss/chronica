@@ -26,7 +26,7 @@
 
 -define(INT_LOG_MODULE(LogLevel, F, A),
     begin
-        chronica_internal_logger:LogLevel(os:timestamp(), F, A,
+        chronica_internal_logger:LogLevel(erlang:timestamp(), F, A,
                                           ?MODULE, ?FUNC_STRING, ?LINE)
     end).
 
