@@ -1415,9 +1415,9 @@ add_application_in_cache(App, RApps, Rules, Cache, Detail_info, TickFun) ->
                 AppModulesCode = case Detail_info of
                     true ->
                         io:format("Compiling the cache: [~p] ", [App]),
-                        T1 = get_timestamp(),
+                        T1 = erlang:system_time(milli_seconds),
                         Apps = generate_app_iface_modules(App, Rules),
-                        T2 = get_timestamp(),
+                        T2 = erlang:system_time(milli_seconds),
                         case Apps of
                             [] -> io:format("skipped~n");
                             _ -> io:format("~pms done.~n", [T2 - T1])
@@ -1435,11 +1435,6 @@ add_application_in_cache(App, RApps, Rules, Cache, Detail_info, TickFun) ->
             ?INT_ERR("Add application ~p failed cause: ~p~n~p", [App, Error, erlang:get_stacktrace()]),
             {Error, {RApps, Cache}}
     end.
-
--spec get_timestamp() -> integer().
-get_timestamp() ->
-    {Mega, Sec, Micro} = os:timestamp(),
-    (Mega * 1000000 + Sec) * 1000 + round(Micro / 1000).
 %%++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 generate_app_iface_modules(App, Rules) ->
@@ -1664,13 +1659,12 @@ load_cache(CacheDir, ConfigHash) ->
                         _ ->
                             {{beam_cache, undef}, Cache}
                     end,
-                Cache2 =
-                    case BeamsCache == cache_beams() of
-                        true ->
-                            Cache1;
-                        false ->
-                            []
-                    end
+                case BeamsCache == cache_beams() of
+                    true ->
+                        Cache1;
+                    false ->
+                        []
+                end
             catch
                 _:_ ->
                     ?INT_ERR("Broken chronica cache in the file (~p)", [Filename]),
