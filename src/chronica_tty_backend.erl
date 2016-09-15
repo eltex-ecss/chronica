@@ -14,7 +14,7 @@
 -include("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
--export([handle_open/2, handle_close/1, handle_write/3, handle_clear/1, handle_rotate/1, handle_check/1]).
+-export([handle_open/3, handle_close/1, handle_write/3, handle_clear/1, handle_rotate/1, handle_check/1]).
 -export([start/0, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(max_mailbox_len, 1000).
@@ -25,8 +25,13 @@
         {
         }).
 
-handle_open(_, _) ->
-    start().
+handle_open(_, _, Files) ->
+    case start() of
+        {ok, Handle} ->
+            {ok, Handle, Files};
+        Other ->
+            Other
+    end.
 
 handle_write(Handle, Data, TypeFormat) ->
     gen_server:cast(Handle, {write, Data, TypeFormat}).

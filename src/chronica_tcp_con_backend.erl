@@ -13,10 +13,11 @@
 
 -behaviour(chronica_gen_backend).
 
--export([handle_open/2, handle_close/1, handle_write/3, handle_clear/1, handle_rotate/1, handle_check/1]).
+-export([handle_open/3, handle_close/1, handle_write/3, handle_clear/1, handle_rotate/1, handle_check/1]).
 
-handle_open(Con, _) when is_pid(Con) -> {ok, erlang:term_to_binary(Con)};
-handle_open(Con, _) -> {error, {bad_con, Con, not_pid}}.
+handle_open(Con, _, Files) when is_pid(Con) ->
+    {ok, erlang:term_to_binary(Con), Files};
+handle_open(Con, _, _) -> {error, {bad_con, Con, not_pid}}.
 
 handle_close(Con) ->
     try

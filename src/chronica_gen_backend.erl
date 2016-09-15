@@ -32,8 +32,8 @@
 
 -type chronica_data() :: binary() | [byte()].
 
--callback handle_open(_Param, Options :: [proplists:property()]) ->
-    {ok, Handle :: module()} | {error, _Reason}.
+-callback handle_open(_Param, Options :: [proplists:property()], _Files) ->
+    {ok, Handle :: module(), _NewFiles} | {error, _Reason}.
 
 -callback handle_close(Handler :: module()) ->
     ok | {error, _Reason}.
@@ -126,17 +126,15 @@ handle_cast(_Unknown, State) ->
     ?INT_ERR("Unhandled cast request ~p", [_Unknown]),
     {noreply, State}.
 
-handle_call({open, Output, Param, Options}, _From, State = #s{closing_flows = ClosingFlows, files = Files}) ->
+handle_call({open, Output, Param, Options}, _From,
+            State = #s{closing_flows = ClosingFlows, files = Files}) ->
     try
-        case Output:handle_open(Param, Options) of
-            {ok, Handle} ->
-                %%TODO: remove this hack, please!!!i
-                REMOVE_HACK = 1,
-                NewFiles = case Output of
-                    chronica_file_backend -> sets:add_element({Output, Handle}, Files);
-                    _ -> Files
-                end,
-                {reply, {ok, {Output, Handle}}, State#s{closing_flows = lists:delete({Output, Handle}, ClosingFlows), files = NewFiles}};
+        case Output:handle_open(Param, Options, Files) of
+            {ok, Handle, NewFiles} ->
+                NewClosingFlows = lists:delete({Output, Handle}, ClosingFlows),
+                {reply, {ok, {Output, Handle}},
+                 State#s{closing_flows = NewClosingFlows,
+                         files = NewFiles}};
             Error -> {reply, Error, State}
         end
     catch
