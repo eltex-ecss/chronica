@@ -16,7 +16,7 @@
 
 -export(
    [
-    handle_open/2,
+    handle_open/3,
     handle_close/1,
     handle_write/3,
     handle_clear/1,
@@ -35,7 +35,7 @@
     code_change/3
    ]).
 
-handle_open({StrIP, Port}, _) ->
+handle_open({StrIP, Port}, _, Files) ->
     try
         case gen_udp:open(?DEFAULT_LOCAL_UDP_PORT, [inet, list, {active, false}]) of
             {ok, Socket} ->
@@ -43,7 +43,7 @@ handle_open({StrIP, Port}, _) ->
                     {ok, Name} ->
                         OpenMsg = io_lib:format("Open UDP log from ~p log to ~p:~p~n", [node(), StrIP, Port]),
                         handle_write(Name, OpenMsg, default),
-                        {ok, Name};
+                        {ok, Name, Files};
                     {error, Reason} ->
                         ?INT_ERR("Error open udp socket(~p:~p) cause cant start gen_server: ~p", [StrIP, Port, Reason]),
                         {error, Reason}

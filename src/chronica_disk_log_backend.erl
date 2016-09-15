@@ -15,7 +15,7 @@
 
 -export(
    [
-    handle_open/2,
+    handle_open/3,
     handle_close/1,
     handle_write/3,
     handle_clear/1,
@@ -26,7 +26,7 @@
     get_application_info/0
    ]).
 
-handle_open(Filename, Options) ->
+handle_open(Filename, Options, Files) ->
     try
         LogRoot = proplists:get_value(log_root, Options, undefined),
         MaxSize = proplists:get_value(max_file_size, Options, undefined),
@@ -52,11 +52,11 @@ handle_open(Filename, Options) ->
                                             {notify, true}
                                             ]) of
                             {ok, Handler} ->
-                                {ok, Handler};
+                                {ok, Handler, Files};
                             {error, {name_already_open, Handler}} ->
-                                {ok, Handler};
+                                {ok, Handler, Files};
                             {repaired, Handler, _, _} ->
-                                {ok, Handler};
+                                {ok, Handler, Files};
                             {error, {size_mismatch, Cursize, NewSize} = Reason} ->
                                 ?INT_DBG("Size of ~p changed ~p -> ~p", [CheckedName, Cursize, NewSize]),
                                 case disk_log:open([{name, LogName}, {file, CheckedName}, {format, external}, {type, wrap}, {size, Cursize}]) of
@@ -66,10 +66,10 @@ handle_open(Filename, Options) ->
                                                 case disk_log:change_size(Handler, NewSize) of
                                                     ok ->
                                                         ?INT_DBG("File ~p successfully open", [CheckedName]),
-                                                        {ok, Handler};
+                                                        {ok, Handler, Files};
                                                     {error, Reason3} ->
                                                         ?INT_ERR("File ~p successfully open, but cant change size(~p->~p) cause: ~p~n", [CheckedName, Cursize, NewSize, Reason3]),
-                                                        {ok, Handler}
+                                                        {ok, Handler, Files}
                                                 end;
                                             {error, Reason2} -> {error, {Reason, Reason2}};
                                             Err ->
@@ -81,7 +81,7 @@ handle_open(Filename, Options) ->
                         end,
                         Res;
                     true ->
-                        {ok, LogName}
+                        {ok, LogName, Files}
                 end;
             false ->
                 ?INT_ERR("Filename should be a string: ~p", [Filename]),
