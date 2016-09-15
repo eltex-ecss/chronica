@@ -15,7 +15,7 @@
 
 -export(
    [
-    handle_open/2,
+    handle_open/3,
     handle_close/1,
     handle_write/3,
     handle_clear/1,
@@ -26,7 +26,15 @@
     get_application_info/0
    ]).
 
-handle_open(Filename, Options) ->
+handle_open(Filename, Options, Files) ->
+    case handle_open_(Filename, Options) of
+        {ok, Handle} ->
+            {ok, Handle, sets:add_element({?MODULE, Handle}, Files)};
+        Other ->
+            Other
+    end.
+
+handle_open_(Filename, Options) ->
     ?INT_DBG("creating log ~p~n", [Filename]),
     try
         LogRoot = proplists:get_value(log_root, Options, undefined),
