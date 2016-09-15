@@ -27,10 +27,10 @@ ttt() ->
     log:error("~p ~B ~w ~n ~X", [a, 2, c, 3, 5]).
 
 time(Fun) ->
-    {StartMegasecs, StartSecs, _} = os:timestamp(),
+    StartSecs = erlang:system_time(seconds),
     Fun(),
-    {StopMegasecs, StopSecs, _} = os:timestamp(),
-    io:format("Finished: ~bs ~n", [StopMegasecs * 1000 + StopSecs - StartMegasecs * 1000 - StartSecs]).
+    StopSecs = erlang:system_time(seconds),
+    io:format("Finished: ~bs ~n", [StopSecs - StartSecs]).
 
 do(0, _) -> ok;
 do(N, Fun) ->
@@ -117,7 +117,9 @@ run_all_tests(TestFun, DefRes, N) ->
     end.
 
 load_test(ProcessNum, MessTimeout, Time) ->
-    Pid = spawn(fun() -> wait_all_process(ProcessNum, os:timestamp()) end),
+    Pid = spawn(fun() ->
+        wait_all_process(ProcessNum, erlang:system_time(seconds))
+    end),
     start_test(ProcessNum, MessTimeout, Time),
     register(wait_process, Pid).
 
@@ -135,9 +137,9 @@ testing_process(MessTimeout, MessNum) ->
             testing_process(MessTimeout, MessNum - 1)
     end.
 
-wait_all_process(0, {StartMegasecs, StartSecs, _}) ->
-    {StopMegasecs, StopSecs, _} = os:timestamp(),
-    io:format("Finished: ~bs ~n", [StopMegasecs * 1000 + StopSecs - StartMegasecs * 1000 - StartSecs]);
+wait_all_process(0, StartSecs) ->
+    StopSecs = erlang:system_time(seconds),
+    io:format("Finished: ~bs ~n", [StopSecs - StartSecs]);
 wait_all_process(ProcessNum, StartTime) ->
     receive
         {_, finished} ->
