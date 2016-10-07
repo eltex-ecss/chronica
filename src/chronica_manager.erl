@@ -190,7 +190,7 @@ handle_cast({remove_tcp_connection, {Name, FlowId}, _Con},
                                   #chronica_config{rules = Rules, flows = Flows}}) ->
     case lists:keytake(FlowId, #chronica_flow.flow_id, Flows) of
         false -> {noreply, State};
-        {value, _, NewFlows} ->
+        {_value, _, NewFlows} ->
             NewRules = lists:keydelete(Name, #chronica_rule.id, Rules),
             NewConfig = Config#chronica_config{rules = NewRules, flows = NewFlows},
 

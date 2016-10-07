@@ -92,7 +92,7 @@ handle_call({close, Pid}, _From, State) ->
     {reply, Reply, State}.
 
 handle_info({pending_reply, Pid, Result0}, State) ->
-    {value, #pending{log = Name, pid = Pid, from = From,
+    {_value, #pending{log = Name, pid = Pid, from = From,
                      req = Request, attach = Attach,
                      clients = Clients}} =
         lists:keysearch(Pid, #pending.pid, State#state.pending),
@@ -276,7 +276,7 @@ do_internal_open(Name, Pid, From, {open, _W, A}=Req, Attach, State) ->
 
 check_pending(Name, From, State, Req) ->
     case lists:keysearch(Name, #pending.log, State#state.pending) of
-        {value, #pending{log = Name, clients = Clients}=P} ->
+        {_value, #pending{log = Name, clients = Clients}=P} ->
             NP = lists:keyreplace(Name, #pending.log, State#state.pending,
                                P#pending{clients = Clients ++ [{Req, From}]}),
             {pending, State#state{pending = NP}};

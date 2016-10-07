@@ -364,7 +364,7 @@ ichunk_bad_end([B | Bs], Mode, Log, C, Bad, A) ->
     case catch binary_to_term(B) of
         {'EXIT', _} when read_write =:= Mode ->
             InfoList = info(Log),
-            {value, {file, FileName}} = lists:keysearch(file, 1, InfoList),
+            {_value, {file, FileName}} = lists:keysearch(file, 1, InfoList),
             File = case C#continuation.pos of
                        Pos when is_integer(Pos) -> FileName; % halt log
                        {FileNo, _} -> add_ext(FileName, FileNo) % wrap log
@@ -1139,7 +1139,7 @@ unblock_pid(L) ->
 %% -> true | false
 is_owner(Pid, L) ->
     case lists:keysearch(Pid, 1, L#log.owners) of
-        {value, {_Pid, Notify}} ->
+        {_value, {_Pid, Notify}} ->
             {true, Notify};
         false ->
             false
