@@ -26,8 +26,9 @@ log_level() -> warning.
 log_modules() -> any.
 
 info(Module, String, _Args) ->
-    NString = lists:flatten(io_lib:format("~s:~ts", [Module, String])),
-    log:info(NString, _Args).
+    % NString = lists:flatten(io_lib:format("~s:~ts", [Module, String])),
+    % log:info(NString, _Args).
+    ok.
 warning(Module, String, _Args) ->
     NString = lists:flatten(io_lib:format("~s:~ts", [Module, String])),
     log:warning(NString, _Args).
