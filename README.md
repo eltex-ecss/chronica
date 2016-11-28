@@ -154,6 +154,11 @@ As previous example but in binary mode
 ```
 Flow output in terminal in "custom_format" format
 
+```erlang
+{journald, [{journald, short}]},
+```
+Flow output in journald (if exist)
+
 #### Formats:
 Define output format for message. Comprises from service macros beginig in '%'.
 Default configuration already have one formats: 'default', but you may be

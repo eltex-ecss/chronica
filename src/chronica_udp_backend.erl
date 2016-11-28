@@ -18,6 +18,7 @@
    [
     handle_open/3,
     handle_close/1,
+    handle_write/4,
     handle_write/3,
     handle_clear/1,
     handle_rotate/1,
@@ -67,6 +68,14 @@ handle_close(Name) ->
     end.
 
 handle_write(Name, Str, TypeFormat) ->
+    try
+        gen_server:cast(Name, {write, Str, TypeFormat})
+    catch
+        _C:E ->
+            {error, E}
+    end.
+
+handle_write(Name, Str, TypeFormat, Params) ->
     try
         gen_server:cast(Name, {write, Str, TypeFormat})
     catch

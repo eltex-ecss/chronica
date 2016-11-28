@@ -13,7 +13,7 @@
 
 -behaviour(chronica_gen_backend).
 
--export([handle_open/3, handle_close/1, handle_write/3, handle_clear/1, handle_rotate/1, handle_check/1]).
+-export([handle_open/3, handle_close/1, handle_write/4, handle_clear/1, handle_rotate/1, handle_check/1]).
 
 handle_open(Con, _, Files) when is_pid(Con) ->
     {ok, erlang:term_to_binary(Con), Files};
@@ -26,14 +26,14 @@ handle_close(Con) ->
         _C:E -> {error, E}
     end.
 
-handle_write(Con, Data, TypeFormat) when TypeFormat =:= binary ->
+handle_write(Con, Data, TypeFormat, Params) when TypeFormat =:= binary ->
     try
         chronica_tcp_connection:write(erlang:binary_to_term(Con), chronica_format_creator:frame(Data))
     catch
         _C:E -> {error, E}
     end;
 
-handle_write(Con, Str, _TypeFormat) ->
+handle_write(Con, Str, _TypeFormat, Params) ->
     try
         chronica_tcp_connection:write(erlang:binary_to_term(Con), Str)
     catch

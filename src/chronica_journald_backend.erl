@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% -*- coding: utf-8 -*-
-%%% @author Timofey Barmin
-%%% @copyright (C) 2015, Eltex, Novosibirsk, Russia
+%%% @author Dylgyrzhapov Buin
+%%% @copyright (C) 2016, Eltex, Novosibirsk, Russia
 %%% @doc
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
--module(chronica_tty_backend).
+-module(chronica_journald_backend).
 
 -behaviour(chronica_gen_backend).
 -behaviour(gen_server).
@@ -23,6 +23,7 @@
 
 -record(s,
         {
+            nodename
         }).
 
 handle_open(_, _, Files) ->
@@ -63,14 +64,21 @@ start() ->
     end.
 
 init(_) ->
-    {ok, #s{}}.
+    {ok, #s{nodename = node()}}.
 
 handle_cast({write, Data, TypeFormat, Params}, State) when TypeFormat =:= binary ->
-    io:format("~w~n", [Data]),
+    Formated = binary_to_term(Data),
+    {Time, Priority, Module, Pid, Line, File, Function, {F,A}} = Formated,
+    Tmp = unicode:characters_to_binary(io_lib:format(F,A)),
+    journald_api:sendv([{"MESSAGE",[Tmp]}, {"PRIORITY", Priority + 1},
+     {"CODE_FILE", Module}, {"CODE_FUNC", Function}, {"CODE_LINE", Line},{"PROCESS_PID", Pid}, {"SYSLOG_IDENTIFIER", State#s.nodename}]),
     check_overload(State);
 
 handle_cast({write, Str, _TypeFormat, Params}, State) ->
-    io:format("~ts", [Str]),
+    {Time, Priority, Module, Pid, Line, File, Function, F, A} = Params,
+    Tmp = unicode:characters_to_binary(io_lib:format(F,A)),
+    journald_api:sendv([{"MESSAGE",[Tmp]}, {"PRIORITY", Priority + 1},
+     {"CODE_FILE", Module}, {"CODE_FUNC", Function}, {"CODE_LINE", Line},{"PROCESS_PID", Pid}, {"SYSLOG_IDENTIFIER", State#s.nodename}]),
     check_overload(State);
 
 handle_cast({close, Reason}, State) ->

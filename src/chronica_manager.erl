@@ -934,7 +934,8 @@ load_config(State = #config_state{loaded_config = LoadedConfig = #chronica_confi
         end,
 
         % Do not add them to head!
-        BackendModules2 = BackendModules ++ [{tty, chronica_tty_backend}, {udp, chronica_udp_backend}, {tcp_con, chronica_tcp_con_backend}, {file, chronica_disk_log_backend}],
+        BackendModules2 = BackendModules ++ [{tty, chronica_tty_backend}, {udp, chronica_udp_backend}, {tcp_con, chronica_tcp_con_backend},
+             {file, chronica_disk_log_backend}, {journald, chronica_journald_backend}],
 
         WriterOptions = [{log_root, LogRoot}, {data_root, DataRoot}, {max_file_size, NewMaxFileSize}, {max_file_num, NewMaxFileNum}, {tty_enabled, TTYEnabled}],
 

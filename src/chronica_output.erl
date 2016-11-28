@@ -36,7 +36,7 @@ put_to_outputs({Time, Priority, Module, Pid, Line, File, Function, F, A} = Param
 
     FormatedStr = chronica_format:Format({Time, Priority, Module, Pid, Line, File, Function, FString}),
     ?INT_DBG("Write message to output ~p", [Handler]),
-    chronica_gen_backend:write(Handler, {FormatedStr, TypeFormat}),
+    chronica_gen_backend:write(Handler, {FormatedStr, TypeFormat}, Params),
     put_to_outputs(Params, NewUserStr, Tail);
 
 put_to_outputs(_ , _, []) ->

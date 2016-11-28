@@ -10,7 +10,8 @@
         compiler,
         syntax_tools,
         pt_lib,
-        pt_scripts
+        pt_scripts,
+        ejournald
     ]},
     {versioned_dependencies, []},
     {mod, {chronica_app, []}},

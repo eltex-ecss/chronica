@@ -13,7 +13,7 @@
 -include("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
--export([open/3, close/2, write/2, clear/1, check/1, rotate/1]).
+-export([open/3, close/2, write/3, clear/1, check/1, rotate/1]).
 
 -export(
    [
@@ -39,7 +39,7 @@
     ok | {error, _Reason}.
 
 -callback handle_write(Handler :: module(), Data :: chronica_data(),
-                       TypeFormat :: binary | text | undefined) ->
+                       TypeFormat :: binary | text | undefined, Params :: term()) ->
     ok | {error, _Reason}.
 
 -callback handle_clear(Handler :: module()) ->
@@ -63,10 +63,10 @@ open(Output, Param, Options) ->
         _:E -> {error, {E, erlang:get_stacktrace()}}
     end.
 
--spec write({atom(), outputHandle()}, {string(), binary | default}) -> ok | {error, term()}.
-write({Output, Handle}, {Str, TypeFormat}) ->
+-spec write({atom(), outputHandle()}, {string(), binary | default}, term()) -> ok | {error, term()}.
+write({Output, Handle}, {Str, TypeFormat}, Params) ->
     try
-        Output:handle_write(Handle, Str, TypeFormat)
+        Output:handle_write(Handle, Str, TypeFormat, Params)
     catch
         _:E -> {error, {E, erlang:get_stacktrace()}}
     end.
