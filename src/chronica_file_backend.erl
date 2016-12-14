@@ -112,7 +112,7 @@ handle_close(Handler) ->
             {error, E}
     end.
 
-handle_write(Handler, Data, TypeFormat, Params) when TypeFormat =:= binary ->
+handle_write(Handler, Data, TypeFormat, _Params) when TypeFormat =:= binary ->
     try
         case chronica_disk_log:balog(Handler, chronica_format_creator:frame(Data)) of
             {error, Reason} ->
@@ -125,7 +125,7 @@ handle_write(Handler, Data, TypeFormat, Params) when TypeFormat =:= binary ->
             {error, E}
     end;
 
-handle_write(Handler, Str, _TypeFormat, Params) ->
+handle_write(Handler, Str, _TypeFormat, _Params) ->
     try
         case chronica_disk_log:balog(Handler, Str) of
             {error, Reason} ->

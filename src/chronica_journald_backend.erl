@@ -21,8 +21,7 @@
 -define(wait_before_restart, 1000).
 -define(wait_for_old_proc, 100000).
 
--record(s,
-        {
+-record(s, {
             nodename
         }).
 
@@ -64,21 +63,21 @@ start() ->
     end.
 
 init(_) ->
-    {ok, #s{nodename = node()}}.
+    {ok, #s{nodename = erlang:atom_to_binary(erlang:node(), utf8)}}.
 
-handle_cast({write, Data, TypeFormat, Params}, State) when TypeFormat =:= binary ->
+handle_cast({write, Data, TypeFormat, _Params}, State = #s{nodename = Node})
+  when TypeFormat =:= binary ->
     Formated = binary_to_term(Data),
-    {Time, Priority, Module, Pid, Line, File, Function, {F,A}} = Formated,
-    Tmp = unicode:characters_to_binary(io_lib:format(F,A)),
-    journald_api:sendv([{"MESSAGE",[Tmp]}, {"PRIORITY", Priority + 1},
-     {"CODE_FILE", Module}, {"CODE_FUNC", Function}, {"CODE_LINE", Line},{"PROCESS_PID", Pid}, {"SYSLOG_IDENTIFIER", State#s.nodename}]),
+    {_Time, Priority, Module, Pid, Line, _File, Func, {F,A}} = Formated,
+    Msg = unicode:characters_to_binary(io_lib:format(F,A)),
+    journald_api:sendv(journald_tags(Msg, Priority, Module, Func, Line, Pid, Node)),
     check_overload(State);
 
-handle_cast({write, Str, _TypeFormat, Params}, State) ->
-    {Time, Priority, Module, Pid, Line, File, Function, F, A} = Params,
-    Tmp = unicode:characters_to_binary(io_lib:format(F,A)),
-    journald_api:sendv([{"MESSAGE",[Tmp]}, {"PRIORITY", Priority + 1},
-     {"CODE_FILE", Module}, {"CODE_FUNC", Function}, {"CODE_LINE", Line},{"PROCESS_PID", Pid}, {"SYSLOG_IDENTIFIER", State#s.nodename}]),
+handle_cast({write, _Str, _TypeFormat, Params},
+        State = #s{nodename = Node}) ->
+    {_Time, Priority, Module, Pid, Line, _File, Func, F, A} = Params,
+    Msg = unicode:characters_to_binary(io_lib:format(F,A)),
+    journald_api:sendv(journald_tags(Msg, Priority, Module, Func, Line, Pid, Node)),
     check_overload(State);
 
 handle_cast({close, Reason}, State) ->
@@ -126,3 +125,27 @@ restart_tty() ->
                     ok
             end
         end).
+
+%% ERROR
+map_priority(1) -> <<"3">>;
+%% WARN
+map_priority(2) -> <<"4">>;
+%% INFO
+map_priority(3) -> <<"6">>;
+%% TRACE
+map_priority(4) -> <<"5">>;
+%% DEBUG
+map_priority(5) -> <<"7">>;
+map_priority(Other) -> Other.
+
+journald_tags(Msg, Priority, Module, Func, Line, Pid, Node) ->
+    [
+     {"MESSAGE",[Msg]},
+     {"PRIORITY", map_priority(Priority)},
+     {"CODE_FILE", Module},
+     {"CODE_FUNC", Func},
+     {"CODE_LINE", Line},
+     {"PROCESS_PID", Pid},
+     {"SYSLOG_IDENTIFIER", Node}
+    ].
+
