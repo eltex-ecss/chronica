@@ -26,14 +26,14 @@ handle_close(Con) ->
         _C:E -> {error, E}
     end.
 
-handle_write(Con, Data, TypeFormat, Params) when TypeFormat =:= binary ->
+handle_write(Con, Data, TypeFormat, _Params) when TypeFormat =:= binary ->
     try
         chronica_tcp_connection:write(erlang:binary_to_term(Con), chronica_format_creator:frame(Data))
     catch
         _C:E -> {error, E}
     end;
 
-handle_write(Con, Str, _TypeFormat, Params) ->
+handle_write(Con, Str, _TypeFormat, _Params) ->
     try
         chronica_tcp_connection:write(erlang:binary_to_term(Con), Str)
     catch

@@ -65,11 +65,11 @@ start() ->
 init(_) ->
     {ok, #s{}}.
 
-handle_cast({write, Data, TypeFormat, Params}, State) when TypeFormat =:= binary ->
+handle_cast({write, Data, TypeFormat, _Params}, State) when TypeFormat =:= binary ->
     io:format("~w~n", [Data]),
     check_overload(State);
 
-handle_cast({write, Str, _TypeFormat, Params}, State) ->
+handle_cast({write, Str, _TypeFormat, _Params}, State) ->
     io:format("~ts", [Str]),
     check_overload(State);
 
