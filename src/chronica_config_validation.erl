@@ -115,6 +115,7 @@ validate_writers([#chronica_backend{type = T, format = F} | Tail], FormatsList) 
         {udp, {IP, Port}} when is_list(IP) and is_integer(Port) -> ok;
         {tcp_con, Con} when is_pid(Con) -> ok;
         {journald, _} -> ok;
+        {rps_alarm, _} -> ok;
         _ -> throw({bad_writer, T})
     end,
     case lists:member(F, [default, binary | FormatsList]) of
