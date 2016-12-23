@@ -57,8 +57,12 @@ log_fast(Iface, Priority, Tags, Module, Line, File, Function, Format, Args) ->
         Iface:log_fast(Priority, Tags, Module, Line, File, Function, Format, Args, undefined, undefined)
     catch
         error:undef ->
-            {_ModName, AppName} = find_application(Iface),
-            ?INT_ERR("Module ~p(~p) try to log, but application ~p isn't registered on chronica", [Module, Line, AppName])
+            Fun = application:get_env(chronica, failback_module, fun io:format/2),
+            case application:get_env(chronica, silent_failback, true) of
+                true  -> nothing;
+                false -> Fun(chronica_core:unwrap_param(Format) ++ "~n",
+                             chronica_core:unwrap_param(Args))
+            end
     end,
     ok.
 
@@ -71,23 +75,3 @@ sys_dbg_off(ProcName) ->
 sys_dbg_handler(State, Event, ProcState) ->
     log:log(?P_DEBUG, State, State, 0, chronica_output:format_sys_dbg(State, Event, ProcState), []),
     State.
-
-find_application(LogIfaceModule) ->
-    case atom_to_list(LogIfaceModule) of
-        "chronica_iface_" ++ ModuleName ->
-            Apps = application:loaded_applications(),
-            {ModuleName, app_search(erlang:list_to_atom(ModuleName), Apps)};
-        _ -> {unknown, unknown}
-    end.
-
-app_search(_ModuleName, []) -> unknown;
-app_search(ModuleName, [{Name, _, _} = App | Tail]) ->
-    case application:get_key(Name, modules) of
-        {ok, List} ->
-            case lists:member(ModuleName, List) of
-                true -> App;
-                false -> app_search(ModuleName, Tail)
-            end;
-        _ ->
-            app_search(ModuleName, Tail)
-    end.
