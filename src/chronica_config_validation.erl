@@ -12,8 +12,7 @@
 
 -include("chronica_config.hrl").
 
-validate(#chronica_config
-                {
+validate(#chronica_config{
                     rules = Rules,
                     flows = Flows,
                     formats = Formats,
@@ -55,7 +54,7 @@ validate_rules(Rules, FlowList) ->
     validate_rules2(Rules, FlowList, []).
 
 validate_rules2([], _FlowList, RuleList) -> RuleList;
-validate_rules2([#chronica_rule{id = Id, mask = M, priority = P, flow_ids = Fs, in_work = InWork} | Tail], FlowList, RuleList) when is_list(M) and is_list(Fs) and ((InWork =:= true) or (InWork =:= false)) ->
+validate_rules2([#chronica_rule{id = Id, mask = M, priority = P, flow_ids = Fs, in_work = InWork} | Tail], FlowList, RuleList) when erlang:is_list(M) and erlang:is_list(Fs) and ((InWork =:= true) or (InWork =:= false)) ->
     try
         lists:map(
             fun (FName) ->
@@ -71,7 +70,7 @@ validate_rules2([#chronica_rule{id = Id, mask = M, priority = P, flow_ids = Fs, 
     catch
         throw:E -> throw({bad_rule, {Id, E}})
     end,
-    case is_atom(Id) of
+    case erlang:is_atom(Id) of
         true -> ok;
         false -> throw({bad_rule_id, Id})
     end,
@@ -90,7 +89,7 @@ validate_flows(Flows, FormatList) ->
     validate_flows2(Flows, FormatList, []).
 
 validate_flows2([], _FormatList, FlowList) -> FlowList;
-validate_flows2([#chronica_flow{flow_id = N, backends = Writers} = F | Tail], FormatList, FlowList) when is_atom(N) and is_list(Writers) ->
+validate_flows2([#chronica_flow{flow_id = N, backends = Writers} = F | Tail], FormatList, FlowList) when erlang:is_atom(N) and erlang:is_list(Writers) ->
     case lists:member(N, FlowList) of
         true -> throw({doubling_flows, N});
         false -> ok
@@ -111,9 +110,9 @@ validate_writers([#chronica_backend{type = T, format = F} | Tail], FormatsList) 
     case T of
         tty -> ok;
         {tty, undefined} -> ok;
-        {file, Name} when is_list(Name) and (Name=/=[]) -> ok;
-        {udp, {IP, Port}} when is_list(IP) and is_integer(Port) -> ok;
-        {tcp_con, Con} when is_pid(Con) -> ok;
+        {file, Name} when erlang:is_list(Name) and (Name=/=[]) -> ok;
+        {udp, {IP, Port}} when erlang:is_list(IP) and erlang:is_integer(Port) -> ok;
+        {tcp_con, Con} when erlang:is_pid(Con) -> ok;
         {journald, _} -> ok;
         _ -> throw({bad_writer, T})
     end,
@@ -137,7 +136,7 @@ validate_colors(Other) ->
     throw({bad_coloring, Other}).
 
 validate_colors_spec([], ColorsSpecList) -> ColorsSpecList;
-validate_colors_spec([{Data, Colors} = Head | Tail], ColorsSpecList) when is_atom(Data) ->
+validate_colors_spec([{Data, Colors} = Head | Tail], ColorsSpecList) when erlang:is_atom(Data) ->
     case lists:keyfind(Data, 1, ColorsSpecList) of
         {Data, _} -> throw({doubling_colors_spec, {Data, Colors}});
         false -> ok
@@ -150,7 +149,7 @@ validate_formats(Formats) ->
     validate_formats2(Formats, []).
 
 validate_formats2([], FormatsList) -> FormatsList;
-validate_formats2([#chronica_format{format_id = N, format = F} | Tail], FormatsList) when is_atom(N) and is_list(F) ->
+validate_formats2([#chronica_format{format_id = N, format = F} | Tail], FormatsList) when erlang:is_atom(N) and erlang:is_list(F) ->
     case lists:member(N, FormatsList) of
         true -> throw({doubling_formats, N});
         false -> ok
@@ -169,12 +168,12 @@ validate_active(true) -> ok;
 validate_active(false) -> ok;
 validate_active(Power) -> throw({bad_active_param, Power}).
 
-validate_internal_logger(InternalLogger) when is_list(InternalLogger) ->
+validate_internal_logger(InternalLogger) when erlang:is_list(InternalLogger) ->
     lists:map(
         fun ({file, FN, {SN, NN}, Filter})
-                    when is_list(FN),
-                         is_integer(SN),
-                         is_integer(NN),
+                    when erlang:is_list(FN),
+                         erlang:is_integer(SN),
+                         erlang:is_integer(NN),
                          (SN > 0),
                          (NN > 0)
                 ->
@@ -203,23 +202,23 @@ validate_il_filter(info) -> ok;
 validate_il_filter(debug) -> ok;
 validate_il_filter(F) -> throw({bad_filter, F}).
 
-validate_log_root(LogRoot) when is_list(LogRoot) and (LogRoot =/= []) ->
+validate_log_root(LogRoot) when erlang:is_list(LogRoot) and (LogRoot =/= []) ->
     ok;
 validate_log_root(LogRoot) ->
     throw({bad_log_root, LogRoot}).
 
-validate_data_root(DataRoot) when is_list(DataRoot) and (DataRoot =/= []) ->
+validate_data_root(DataRoot) when erlang:is_list(DataRoot) and (DataRoot =/= []) ->
     ok;
 validate_data_root(DataRoot) ->
     throw({bad_data_root, DataRoot}).
 
 validate_sizes(MaxFileSize, MaxFileNum) ->
     case MaxFileSize of
-        S when is_integer(S) and (S > 0)  -> ok;
+        S when erlang:is_integer(S) and (S > 0)  -> ok;
         _ -> throw({bad_max_file_size, MaxFileSize})
     end,
     case MaxFileNum of
-        N when is_integer(N) and (N > 0)  -> ok;
+        N when erlang:is_integer(N) and (N > 0)  -> ok;
         _ -> throw({bad_max_file_size, MaxFileSize})
     end,
     ok.
@@ -233,6 +232,6 @@ validate_tty_enabled(false) -> ok;
 validate_tty_enabled(P) -> throw({bad_tty_enabled, P}).
 
 validate_backend_modules([]) -> ok;
-validate_backend_modules([{Type, Module}|T]) when is_atom(Type), is_atom(Module) -> validate_backend_modules(T);
+validate_backend_modules([{Type, Module}|T]) when erlang:is_atom(Type), erlang:is_atom(Module) -> validate_backend_modules(T);
 validate_backend_modules([Inval|_]) -> throw({bad_backend, Inval});
 validate_backend_modules(Inval) -> throw({bad_backends, Inval}).
