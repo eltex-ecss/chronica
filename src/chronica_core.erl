@@ -8,19 +8,21 @@
 %%%-------------------------------------------------------------------
 -module(chronica_core).
 
+-compile(inline_list_funcs).
+-compile(inline).
+
 -include("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 -include_lib("pt_scripts/include/pt_recompilable.hrl").
 
--export(
-        [
-            sync_fast_log/1,
-            unwrap_param/1,
-            sys_dbg_on/2, sys_dbg_off/1,
-            log_fast/9
-        ]).
+-export([
+    sync_fast_log/1,
+    unwrap_param/1,
+    sys_dbg_on/2, sys_dbg_off/1,
+    log_fast/9
+    ]).
 
-unwrap_param(Param) when is_function(Param, 0) ->
+unwrap_param(Param) when erlang:is_function(Param, 0) ->
     try
         Param()
     catch
@@ -43,7 +45,7 @@ sync_fast_log({fast_log_message, Priority, Format, Args, ModuleName, Line, File,
             not_found ->
                 ?INT_ERR("Flows for (~p, ~p) are not found", [Key, Priority]);
             [] -> ok;
-            Flows when is_list(Flows) ->
+            Flows when erlang:is_list(Flows) ->
                 chronica_output:log_it(Priority, NowTime, unwrap_param(Format), unwrap_param(Args), ModuleName, Line, File, Function, Pid, Flows);
             BadReturn ->
                 ?INT_ERR("get_flows(~p, ~p) returned ~p", [Key, Priority, BadReturn])

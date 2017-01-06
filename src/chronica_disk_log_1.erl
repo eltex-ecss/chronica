@@ -16,8 +16,7 @@
 -include("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
--export(
-   [
+-export([
     change_size_wrap/3,
     chunk/5,
     chunk_read_only/5,
@@ -51,11 +50,13 @@
     truncate/3,
     truncate_at/3,
     write_cache/2
-   ]).
+    ]).
 
+-compile(inline_list_funcs).
+-compile(inline).
 -compile({inline, [
-                   {scan_f2, 7}
-                  ]}).
+    {scan_f2, 7}
+    ]}).
 
 -import(lists, [concat/1, reverse/1, sum/1]).
 
@@ -138,7 +139,7 @@ truncate(FdC, FileName, Head) ->
     end.
 
 %% -> {NewFdC, Reply}, Reply = {Cont, Binaries} | {error, Reason} | eof
-chunk(FdC, FileName, Pos, B, N) when is_binary(B) ->
+chunk(FdC, FileName, Pos, B, N) when erlang:is_binary(B) ->
     true = byte_size(B) >= ?HEADERSZ,
     do_handle_chunk(FdC, FileName, Pos, B, N);
 chunk(FdC, FileName, Pos, NoBytes, N) ->
@@ -154,7 +155,7 @@ chunk(FdC, FileName, Pos, NoBytes, N) ->
             do_handle_chunk(NewFdC, FileName, NewPos, Bin, N);
     {NewFdC, {ok, _Bin}} ->
         {NewFdC, {error, {corrupt_log_file, FileName}}};
-    {NewFdC, eof} when is_integer(NoBytes) -> % "cannot happen"
+    {NewFdC, eof} when erlang:is_integer(NoBytes) -> % "cannot happen"
         {NewFdC, {error, {corrupt_log_file, FileName}}};
     Other -> % eof or error
         Other
@@ -233,7 +234,7 @@ chunk_read_only(Fd, FileName, Pos, B, N) ->
     {_NFdC, Reply} = do_chunk_read_only(FdC, FileName, Pos, B, N),
     Reply.
 
-do_chunk_read_only(FdC, FileName, Pos, B, N) when is_binary(B) ->
+do_chunk_read_only(FdC, FileName, Pos, B, N) when erlang:is_binary(B) ->
     true = byte_size(B) >= ?HEADERSZ,
     do_handle_chunk_ro(FdC, FileName, Pos, B, N);
 do_chunk_read_only(FdC, FileName, Pos, NoBytes, N) ->
@@ -251,7 +252,7 @@ do_chunk_read_only(FdC, FileName, Pos, NoBytes, N) ->
     {NewFdC, {ok, Bin}} ->
         NewCont = #continuation{pos = Pos+byte_size(Bin), b = []},
         {NewFdC, {NewCont, [], byte_size(Bin)-?HEADERSZ}};
-    {NewFdC, eof} when is_integer(NoBytes) -> % "cannot happen"
+    {NewFdC, eof} when erlang:is_integer(NoBytes) -> % "cannot happen"
         {NewFdC, eof}; % what else?
     Other ->
         Other
@@ -342,7 +343,7 @@ int_open(FName, Repair, read_write, Head) ->
                 case open_update(FName) of
                 {ok, Fd2} ->
                     mark(Fd2, FName, ?OPENED),
-                                    FdC1 = #cache{fd = Fd2},
+                    FdC1 = #cache{fd = Fd2},
                     {FdC, P} = position_close(FdC1, FName, eof),
                     {ok, {existed, FdC, {0, 0}, P}};
                 Error ->
@@ -480,14 +481,14 @@ mark(Fd, FileName, What) ->
 %% -> {ok, Bin} | Error
 lh({ok, Bin}, _Format) ->
     {ok, Bin};
-lh({M, F, A}, Format) when is_list(A) ->
+lh({M, F, A}, Format) when erlang:is_list(A) ->
     case catch apply(M, F, A) of
     {ok, Head} when Format =:= internal ->
-        {ok, term_to_binary(Head)};
-    {ok, Bin} when is_binary(Bin) ->
+        {ok, erlang:term_to_binary(Head)};
+    {ok, Bin} when erlang:is_binary(Bin) ->
         {ok, Bin};
     {ok, Bytes} ->
-        case catch list_to_binary(Bytes) of
+        case catch erlang:list_to_binary(Bytes) of
         {'EXIT', _} ->
             {error, {invalid_header, {{M, F, A}, {ok, Bytes}}}};
         Bin ->
@@ -517,7 +518,7 @@ scan_f_read(B, In, Out, File, FSz, Tmp, MaxBytes, No, Bad) ->
         eof ->
             done_scan(In, Out, Tmp, File, No, Bad+byte_size(B));
         {ok, Bin}  ->
-            NewBin = list_to_binary([B, Bin]),
+            NewBin = erlang:list_to_binary([B, Bin]),
             {NB, NMax, Ack, NNo, NBad} =
                 scan_f(NewBin, FSz, [], No, Bad),
             case log(Out, Tmp, lists:reverse(Ack)) of
@@ -617,7 +618,7 @@ is_head(<<M:4/binary, S:4/binary>>) when ?LOGMAGIC =:= M, ?CLOSED =:= S ->
     yes;
 is_head(<<M:4/binary, S:4/binary>>) when ?LOGMAGIC =:= M, ?OPENED =:= S ->
     yes_not_closed;
-is_head(Bin) when is_binary(Bin) ->
+is_head(Bin) when erlang:is_binary(Bin) ->
     no.
 
 %%-----------------------------------------------------------------
@@ -1176,7 +1177,7 @@ parse_index(CurF, V, N, B, Fd, CurSz, TotSz, NFiles) ->
     eof when 0 =:= byte_size(B) ->
         {CurF, CurSz, TotSz, NFiles};
     {ok, Bin} ->
-            NewB = list_to_binary([B, Bin]),
+            NewB = erlang:list_to_binary([B, Bin]),
         parse_index(CurF, V, N, NewB, Fd, CurSz, TotSz, NFiles);
     _ErrorOrEof ->
         {1, 0, 0, 0}
@@ -1358,11 +1359,11 @@ read_size_file_version(FName) ->
         {{0, 0}, ?VERSION}
     end.
 
-conv({More, Terms}, FileNo) when is_record(More, continuation) ->
-    Cont = More#continuation{pos = {FileNo, More#continuation.pos}},
+conv({#continuation{pos = Pos}=More, Terms}, FileNo) ->
+    Cont = More#continuation{pos = {FileNo, Pos}},
     {Cont, Terms};
-conv({More, Terms, Bad}, FileNo) when is_record(More, continuation) ->
-    Cont = More#continuation{pos = {FileNo, More#continuation.pos}},
+conv({#continuation{pos = Pos}=More, Terms, Bad}, FileNo) ->
+    Cont = More#continuation{pos = {FileNo, Pos}},
     {Cont, Terms, Bad};
 conv(Other, _) ->
     Other.

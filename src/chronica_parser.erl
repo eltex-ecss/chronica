@@ -10,6 +10,9 @@
 -module(chronica_parser).
 -include("chronica_parser.hrl").
 
+-compile(inline_list_funcs).
+-compile(inline).
+
 -export([tokenize_format_string/1]).
 
 tokenize_format_string(Input) ->

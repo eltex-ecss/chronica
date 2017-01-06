@@ -7,22 +7,23 @@
 -behaviour(gen_server).
 
 -export([
-            start/1,
-            start_link/1,
-            start/2,
-            start_link/2,
-            add_event/2,
-            get_events/1,
-            get_events/2,
-            get_event/2
-        ]).
+    start/1,
+    start_link/1,
+    start/2,
+    start_link/2,
+    add_event/2,
+    get_events/1,
+    get_events/2,
+    get_event/2
+    ]).
 
--export([init/1,
-         handle_call/3,
-         handle_cast/2,
-         handle_info/2,
-         terminate/2,
-         code_change/3]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3]).
 
 start(MaxEvents) ->
     gen_server:start(?MODULE, [MaxEvents], []).
@@ -49,10 +50,10 @@ get_event(Buffer, Id) ->
     gen_server:call(Buffer, {get_event, Id}).
 
 -record(s, {
-        max_events :: non_neg_integer(),
-        events = queue:new(),
-        num = 0 :: non_neg_integer(),
-        current_id = 0 :: non_neg_integer()
+    max_events :: non_neg_integer(),
+    events = queue:new(),
+    num = 0 :: non_neg_integer(),
+    current_id = 0 :: non_neg_integer()
     }).
 
 -spec init([non_neg_integer()]) -> {ok, #s{}}.

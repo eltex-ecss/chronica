@@ -44,11 +44,10 @@
 -define(P_TRACE, 4).
 -define(P_DEBUG, 5).
 
--record(flow_handle,
-{
+-record(flow_handle, {
     id :: term(),
     format_type :: atom(),
     output_module :: atom(),
     open_params :: term(),
     writer_options :: term()
-}).
+    }).

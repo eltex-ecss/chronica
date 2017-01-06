@@ -8,13 +8,15 @@
 %%%-------------------------------------------------------------------
 -module(chronica_file_backend).
 
+-compile(inline_list_funcs).
+-compile(inline).
+
 -include_lib("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
 -behaviour(chronica_gen_backend).
 
--export(
-   [
+-export([
     handle_open/3,
     handle_close/1,
     handle_write/4,
@@ -24,7 +26,7 @@
     get_header/0,
     get_application_info/1,
     get_application_info/0
-   ]).
+    ]).
 
 handle_open(Filename, Options, Files) ->
     case handle_open_(Filename, Options) of
@@ -46,11 +48,11 @@ handle_open_(Filename, Options) ->
             true  -> throw({invalid_options, Options})
         end,
 
-        case is_list(Filename) of
+        case erlang:is_list(Filename) of
             true ->
                 CheckedName = check_filename(Filename, LogRoot),
                 LogName = erlang:list_to_atom("chronica_file_backend_" ++ Filename),
-                case lists:member(LogName, element(1, chronica_disk_log:accessible_logs())) of
+                case lists:member(LogName, erlang:element(1, chronica_disk_log:accessible_logs())) of
                     false ->
                         Res = case chronica_disk_log:open([
                                             {name, LogName},
@@ -112,7 +114,7 @@ handle_close(Handler) ->
             {error, E}
     end.
 
-handle_write(Handler, Data, TypeFormat, _Params) when TypeFormat =:= binary ->
+handle_write(Handler, Data, binary, _Params) ->
     try
         case chronica_disk_log:balog(Handler, chronica_format_creator:frame(Data)) of
             {error, Reason} ->

@@ -14,8 +14,7 @@
 
 -module(chronica_disk_log).
 
--export(
-   [
+-export([
     accessible_logs/0,
     alog/2,
     alog_terms/2,
@@ -53,17 +52,16 @@
     truncate/1,
     truncate/2,
     unblock/1
-   ]).
+    ]).
 
 %% Internal exports
--export(
-   [
+-export([
     init/2,
     internal_open/2,
     system_continue/3,
     system_terminate/4,
     system_code_change/4
-   ]).
+    ]).
 
 %% To be used by chronica_disk_log_h.erl (not (yet) in Erlang/OTP) only.
 -export([ll_open/1, ll_close/1, do_log/2, do_sync/1, do_info/2]).
@@ -77,31 +75,31 @@
 -type dlog_state_error() :: 'ok' | {'error', _}.
 
 -record(state, {
-          queue = [],
-          messages = [],
-          parent,
-          server,
-          cnt = 0           :: non_neg_integer(),
-          args,
-          error_status = ok :: dlog_state_error(),
-          cache_error = ok     %% cache write error after timeout
-         }).
+    queue = [],
+    messages = [],
+    parent,
+    server,
+    cnt = 0           :: non_neg_integer(),
+    args,
+    error_status = ok :: dlog_state_error(),
+    cache_error = ok     %% cache write error after timeout
+    }).
 
 -include("chronica_disk_log.hrl").
 
--define(failure(Error, Function, Arg),
-        {{failed, Error}, [{?MODULE, Function, Arg}]}).
+-define(failure(Error, Function, Arg), {{failed, Error}, [{?MODULE, Function, Arg}]}).
 
 -define(PROFILE(C), void).
 
--compile({inline,
-          [
-           {log_loop, 4},
-           {log_end_sync, 2},
-           {replies, 2},
-           {rflat, 1}
-          ]
-         }).
+-compile(inline_list_funcs).
+-compile(inline).
+-compile({inline, [
+    {log_loop, 4},
+    {log_end_sync, 2},
+    {replies, 2},
+    {rflat, 1},
+    {check_bytes, 1}
+    ]}).
 
 %%%----------------------------------------------------------------------
 %%% Contract type specifications
@@ -156,7 +154,7 @@ open(A) ->
 
 -spec log(Log :: any(), Term :: term()) -> 'ok' | {'error', log_error_rsn()}.
 log(Log, Term) ->
-    req(Log, {log, term_to_binary(Term)}).
+    req(Log, {log, erlang:term_to_binary(Term)}).
 
 -spec blog(Log :: any(), Bytes :: bytes()) -> 'ok' | {'error', log_error_rsn()}.
 blog(Log, Bytes) ->
@@ -169,14 +167,14 @@ log_terms(Log, Terms) ->
 
 -spec blog_terms(Log :: any(), Bytes :: [bytes()]) -> 'ok' | {'error', any()}.
 blog_terms(Log, Bytess) ->
-    Bs = check_bytes_list(Bytess, Bytess),
+    Bs = check_bytes_list(Bytess),
     req(Log, {blog, Bs}).
 
 -type notify_ret() :: 'ok' | {'error', 'no_such_log'}.
 
 -spec alog(Log :: any(), Term :: term()) -> notify_ret().
 alog(Log, Term) ->
-    notify(Log, {alog, term_to_binary(Term)}).
+    notify(Log, {alog, erlang:term_to_binary(Term)}).
 
 -spec alog_terms(Log :: any(), Terms :: [term()]) -> notify_ret().
 alog_terms(Log, Terms) ->
@@ -189,7 +187,7 @@ balog(Log, Bytes) ->
 
 -spec balog_terms(Log :: any(), Bytes :: [bytes()]) -> notify_ret().
 balog_terms(Log, Bytess) ->
-    Bs = check_bytes_list(Bytess, Bytess),
+    Bs = check_bytes_list(Bytess),
     notify(Log, {balog, Bs}).
 
 -type close_error_rsn() ::'no_such_log' | 'nonode'
@@ -204,9 +202,9 @@ close(Log) ->
 
 -spec lclose(Log :: any()) -> 'ok' | {'error', lclose_error_rsn()}.
 lclose(Log) ->
-    lclose(Log, node()).
+    lclose(Log, erlang:node()).
 
--spec lclose(Log :: any(), Node :: node()) -> 'ok' | {'error', lclose_error_rsn()}.
+-spec lclose(Log :: any(), Node :: erlang:node()) -> 'ok' | {'error', lclose_error_rsn()}.
 lclose(Log, Node) ->
     lreq(Log, close, Node).
 
@@ -222,7 +220,7 @@ truncate(Log) ->
 
 -spec truncate(Log :: any(), Head :: any()) -> 'ok' | {'error', trunc_error_rsn()}.
 truncate(Log, Head) ->
-    req(Log, {truncate, {ok, term_to_binary(Head)}, truncate, 2}).
+    req(Log, {truncate, {ok, erlang:term_to_binary(Head)}, truncate, 2}).
 
 -spec btruncate(Log :: any(), Head :: bytes()) -> 'ok' | {'error', trunc_error_rsn()}.
 btruncate(Log, Head) ->
@@ -235,7 +233,7 @@ reopen(Log, NewFile) ->
 -spec reopen(Log :: any(), Filename :: string(), Head :: any()) ->
     'ok' | {'error', any()}.
 reopen(Log, NewFile, NewHead) ->
-    req(Log, {reopen, NewFile, {ok, term_to_binary(NewHead)}, reopen, 3}).
+    req(Log, {reopen, NewFile, {ok, erlang:term_to_binary(NewHead)}, reopen, 3}).
 
 -spec breopen(Log :: any(), Filename :: string(), Head :: bytes()) ->
     'ok' | {'error', any()}.
@@ -322,22 +320,21 @@ chunk(Log, Cont) ->
 chunk(Log, Cont, infinity) ->
     %% There cannot be more than ?MAX_CHUNK_SIZE terms in a chunk.
     ichunk(Log, Cont, ?MAX_CHUNK_SIZE);
-chunk(Log, Cont, N) when is_integer(N), N > 0 ->
+chunk(Log, Cont, N) when erlang:is_integer(N), N > 0 ->
     ichunk(Log, Cont, N).
 
 ichunk(Log, start, N) ->
     R = sreq(Log, {chunk, 0, [], N}),
     ichunk_end(R, Log);
-ichunk(Log, More, N) when is_record(More, continuation) ->
-    R = req2(More#continuation.pid,
-             {chunk, More#continuation.pos, More#continuation.b, N}),
+ichunk(Log, #continuation{pid = Pid, pos = Pos, b = B}, N) ->
+    R = req2(Pid, {chunk, Pos, B, N}),
     ichunk_end(R, Log);
 ichunk(_Log, _, _) ->
     {error, {badarg, continuation}}.
 
-ichunk_end({C, R}, Log) when is_record(C, continuation) ->
+ichunk_end({#continuation{} = C, R}, Log) ->
     ichunk_end(R, read_write, Log, C, 0);
-ichunk_end({C, R, Bad}, Log) when is_record(C, continuation) ->
+ichunk_end({#continuation{} = C, R, Bad}, Log) ->
     ichunk_end(R, read_only, Log, C, Bad);
 ichunk_end(R, _Log) ->
     R.
@@ -366,7 +363,7 @@ ichunk_bad_end([B | Bs], Mode, Log, C, Bad, A) ->
             InfoList = info(Log),
             {_value, {file, FileName}} = lists:keysearch(file, 1, InfoList),
             File = case C#continuation.pos of
-                       Pos when is_integer(Pos) -> FileName; % halt log
+                       Pos when erlang:is_integer(Pos) -> FileName; % halt log
                        {FileNo, _} -> add_ext(FileName, FileNo) % wrap log
                    end,
             {error, {corrupt_log_file, File}};
@@ -375,7 +372,7 @@ ichunk_bad_end([B | Bs], Mode, Log, C, Bad, A) ->
                                          Sz + byte_size(Bin) + ?HEADERSZ
                                  end, 0, Bs),
             NewPos = case C#continuation.pos of
-                         Pos when is_integer(Pos) -> Pos-Reread;
+                         Pos when erlang:is_integer(Pos) -> Pos-Reread;
                          {FileNo, Pos} -> {FileNo, Pos-Reread}
                      end,
             NewBad = Bad + byte_size(B),
@@ -394,7 +391,7 @@ bchunk(Log, Cont) ->
 bchunk(Log, Cont, infinity) ->
     %% There cannot be more than ?MAX_CHUNK_SIZE terms in a chunk.
     bichunk(Log, Cont, ?MAX_CHUNK_SIZE);
-bchunk(Log, Cont, N) when is_integer(N), N > 0 ->
+bchunk(Log, Cont, N) when erlang:is_integer(N), N > 0 ->
     bichunk(Log, Cont, N).
 
 bichunk(Log, start, N) ->
@@ -406,29 +403,29 @@ bichunk(_Log, #continuation{pid = Pid, pos = Pos, b = B}, N) ->
 bichunk(_Log, _, _) ->
     {error, {badarg, continuation}}.
 
-bichunk_end({C = #continuation{}, R}) ->
+bichunk_end({#continuation{} = C, R}) ->
     {C, lists:reverse(R)};
-bichunk_end({C = #continuation{}, R, Bad}) ->
+bichunk_end({#continuation{} = C, R, Bad}) ->
     {C, lists:reverse(R), Bad};
 bichunk_end(R) ->
     R.
 
 -spec chunk_step(Log :: any(), Cont :: any(), N :: integer()) ->
     {'ok', any()} | {'error', any()}.
-chunk_step(Log, Cont, N) when is_integer(N) ->
+chunk_step(Log, Cont, N) when erlang:is_integer(N) ->
     ichunk_step(Log, Cont, N).
 
 ichunk_step(Log, start, N) ->
     sreq(Log, {chunk_step, 0, N});
-ichunk_step(_Log, More, N) when is_record(More, continuation) ->
-    req2(More#continuation.pid, {chunk_step, More#continuation.pos, N});
+ichunk_step(_Log, #continuation{pid = Pid, pos = Pos}, N) ->
+    req2(Pid, {chunk_step, Pos, N});
 ichunk_step(_Log, _, _) ->
     {error, {badarg, continuation}}.
 
 -spec chunk_info(More :: any()) ->
-    [{'node', node()}, ...] | {'error', {'no_continuation', any()}}.
-chunk_info(More = #continuation{}) ->
-   [{node, node(More#continuation.pid)}];
+    [{'node', erlang:node()}, ...] | {'error', {'no_continuation', any()}}.
+chunk_info(#continuation{pid = Pid}) ->
+   [{node, erlang:node(Pid)}];
 chunk_info(BadCont) ->
    {error, {no_continuation, BadCont}}.
 
@@ -484,7 +481,7 @@ check_arg([], Res) ->
             end;
         Res#arg.repair =:= truncate, Res#arg.mode =:= read_only ->
             {error, {badarg, repair_read_only}};
-        Res#arg.type =:= halt, is_tuple(Res#arg.size) ->
+        Res#arg.type =:= halt, erlang:is_tuple(Res#arg.size) ->
             {error, {badarg, size}};
         Res#arg.type =:= wrap ->
             {OldSize, Version} =
@@ -493,11 +490,11 @@ check_arg([], Res) ->
         true ->
             Ret
     end;
-check_arg([{file, F} | Tail], Res) when is_list(F) ->
+check_arg([{file, F} | Tail], Res) when erlang:is_list(F) ->
     check_arg(Tail, Res#arg{file = F});
-check_arg([{file, F} | Tail], Res) when is_atom(F) ->
+check_arg([{file, F} | Tail], Res) when erlang:is_atom(F) ->
     check_arg(Tail, Res#arg{file = F});
-check_arg([{linkto, Pid} |Tail], Res) when is_pid(Pid) ->
+check_arg([{linkto, Pid} |Tail], Res) when erlang:is_pid(Pid) ->
     check_arg(Tail, Res#arg{linkto = Pid});
 check_arg([{linkto, none} |Tail], Res) ->
     check_arg(Tail, Res#arg{linkto = none});
@@ -509,12 +506,12 @@ check_arg([{repair, false}|Tail], Res) ->
     check_arg(Tail, Res#arg{repair = false});
 check_arg([{repair, truncate}|Tail], Res) ->
     check_arg(Tail, Res#arg{repair = truncate});
-check_arg([{size, Int}|Tail], Res) when is_integer(Int), Int > 0 ->
+check_arg([{size, Int}|Tail], Res) when erlang:is_integer(Int), Int > 0 ->
     check_arg(Tail, Res#arg{size = Int});
 check_arg([{size, infinity}|Tail], Res) ->
     check_arg(Tail, Res#arg{size = infinity});
 check_arg([{size, {MaxB, MaxF}}|Tail], Res)
-  when is_integer(MaxB), is_integer(MaxF),
+  when erlang:is_integer(MaxB), erlang:is_integer(MaxF),
        MaxB > 0, MaxB =< ?MAX_BYTES, MaxF > 0, MaxF < ?MAX_FILES ->
     check_arg(Tail, Res#arg{size = {MaxB, MaxF}});
 check_arg([{type, wrap}|Tail], Res) ->
@@ -527,7 +524,7 @@ check_arg([{format, external}|Tail], Res) ->
     check_arg(Tail, Res#arg{format = external});
 check_arg([{distributed, []}|Tail], Res) ->
     check_arg(Tail, Res#arg{distributed = false});
-check_arg([{distributed, Nodes}|Tail], Res) when is_list(Nodes) ->
+check_arg([{distributed, Nodes}|Tail], Res) when erlang:is_list(Nodes) ->
     check_arg(Tail, Res#arg{distributed = {true, Nodes}});
 check_arg([{notify, true}|Tail], Res) ->
     check_arg(Tail, Res#arg{notify = true});
@@ -544,19 +541,18 @@ check_arg([{mode, read_write}|Tail], Res) ->
 check_arg(Arg, _) ->
     {error, {badarg, Arg}}.
 
-check_wrap_arg({ok, Res}, {0, 0}, _Version) when Res#arg.size =:= infinity ->
+check_wrap_arg({ok, #arg{size=infinity}}, {0, 0}, _Version) ->
     {error, {badarg, size}};
-check_wrap_arg({ok, Res}, OldSize, Version) when Res#arg.size =:= infinity ->
+check_wrap_arg({ok, #arg{size=infinity} = Res}, OldSize, Version) ->
     NewRes = Res#arg{size = OldSize},
     check_wrap_arg({ok, NewRes}, OldSize, Version);
 check_wrap_arg({ok, Res}, {0, 0}, Version) ->
     {ok, Res#arg{version = Version}};
-check_wrap_arg({ok, Res}, OldSize, Version) when OldSize =:= Res#arg.size ->
+check_wrap_arg({ok, #arg{size=OldSize} = Res}, OldSize, Version) ->
     {ok, Res#arg{version = Version}};
-check_wrap_arg({ok, Res}, _OldSize, Version)
-  when Res#arg.repair =:= truncate, is_tuple(Res#arg.size) ->
+check_wrap_arg({ok, #arg{repair = truncate, size = Size} = Res}, _OldSize, Version) when erlang:is_tuple(Size) ->
     {ok, Res#arg{version = Version}};
-check_wrap_arg({ok, Res}, OldSize, _Version) when is_tuple(Res#arg.size) ->
+check_wrap_arg({ok, #arg{size = Size} = Res}, OldSize, _Version) when erlang:is_tuple(Size) ->
     {error, {size_mismatch, OldSize, Res#arg.size}};
 check_wrap_arg({ok, _Res}, _OldSize, _Version) ->
     {error, {badarg, size}};
@@ -580,7 +576,7 @@ loop(State) ->
     [M | Ms] = State#state.messages,
     handle(M, State#state{messages = Ms}).
 
-handle({From, write_cache}, S) when From =:= self() ->
+handle({From, write_cache}, S) when From =:= erlang:self() ->
     case catch do_write_cache(get(log)) of
         ok ->
             loop(S);
@@ -588,269 +584,259 @@ handle({From, write_cache}, S) when From =:= self() ->
             loop(S#state{cache_error = Error})
     end;
 handle({From, {log, B}}, S) ->
-    case get(log) of
-        L when L#log.mode =:= read_only ->
-            reply(From, {error, {read_only_mode, L#log.name}}, S);
-        L when L#log.status =:= ok, L#log.format =:= internal ->
+    case erlang:get(log) of
+        #log{mode = read_only, name = Name} ->
+            reply(From, {error, {read_only_mode, Name}}, S);
+        #log{status = ok, format = internal} ->
             log_loop(S, From, [B], []);
-        L when L#log.status =:= ok, L#log.format =:= external ->
-            reply(From, {error, {format_external, L#log.name}}, S);
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
-        L when L#log.blocked_by =:= From ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = ok, format=external, name = Name} ->
+            reply(From, {error, {format_external, Name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
+        #log{blocked_by = From, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _ ->
             loop(S#state{queue = [{From, {log, B}} | S#state.queue]})
     end;
 handle({From, {blog, B}}, S) ->
-    case get(log) of
-        L when L#log.mode =:= read_only ->
-            reply(From, {error, {read_only_mode, L#log.name}}, S);
-        L when L#log.status =:= ok ->
+    case erlang:get(log) of
+        #log{mode = read_only, name = Name} ->
+            reply(From, {error, {read_only_mode, Name}}, S);
+        #log{status = ok} ->
             log_loop(S, From, [B], []);
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
-        L when L#log.blocked_by =:= From ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
+        #log{blocked_by = From, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _ ->
             loop(S#state{queue = [{From, {blog, B}} | S#state.queue]})
     end;
 handle({alog, B}, S) ->
-    case get(log) of
-        L when L#log.mode =:= read_only ->
+    case erlang:get(log) of
+        #log{mode = read_only} ->
             notify_owners({read_only, B}),
             loop(S);
-        L when L#log.status =:= ok, L#log.format =:= internal ->
+        #log{status = ok, format = internal} ->
             log_loop(S, [], [B], []);
-        L when L#log.status =:= ok ->
+        #log{status = ok} ->
             notify_owners({format_external, B}),
             loop(S);
-        L when L#log.status =:= {blocked, false} ->
+        #log{status = {blocked, false}} ->
             notify_owners({blocked_log, B}),
             loop(S);
         _ ->
             loop(S#state{queue = [{alog, B} | S#state.queue]})
     end;
 handle({balog, B}, S) ->
-    case get(log) of
-        L when L#log.mode =:= read_only ->
+    case erlang:get(log) of
+        #log{mode = read_only} ->
             notify_owners({read_only, B}),
             loop(S);
-        L when L#log.status =:= ok ->
+        #log{status = ok} ->
             log_loop(S, [], [B], []);
-        L when L#log.status =:= {blocked, false} ->
+        #log{status = {blocked, false}} ->
             notify_owners({blocked_log, B}),
             loop(S);
         _ ->
             loop(S#state{queue = [{balog, B} | S#state.queue]})
     end;
 handle({From, {block, QueueLogRecs}}, S) ->
-    case get(log) of
-        L when L#log.status =:= ok ->
+    case erlang:get(log) of
+        #log{status = ok} = L ->
             do_block(From, QueueLogRecs, L),
             reply(From, ok, S);
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
-        L when L#log.blocked_by =:= From ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
+        #log{blocked_by = From, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _ ->
-            loop(S#state{queue = [{From, {block, QueueLogRecs}} |
-                                  S#state.queue]})
+            loop(S#state{queue = [{From, {block, QueueLogRecs}} | S#state.queue]})
     end;
 handle({From, unblock}, S) ->
-    case get(log) of
-        L when L#log.status =:= ok ->
-            reply(From, {error, {not_blocked, L#log.name}}, S);
-        L when L#log.blocked_by =:= From ->
+    case erlang:get(log) of
+        #log{status = ok, name = Name} ->
+            reply(From, {error, {not_blocked, Name}}, S);
+        #log{blocked_by = From} = L ->
             S2 = do_unblock(L, S),
             reply(From, ok, S2);
-        L ->
-            reply(From, {error, {not_blocked_by_pid, L#log.name}}, S)
+        #log{name = Name} ->
+            reply(From, {error, {not_blocked_by_pid, Name}}, S)
     end;
 handle({From, sync}, S) ->
-    case get(log) of
-        L when L#log.mode =:= read_only ->
-            reply(From, {error, {read_only_mode, L#log.name}}, S);
-        L when L#log.status =:= ok ->
+    case erlang:get(log) of
+        #log{mode = read_only, name = Name} ->
+            reply(From, {error, {read_only_mode, Name}}, S);
+        #log{status = ok} ->
             sync_loop([From], S);
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
-        L when L#log.blocked_by =:= From ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
+        #log{blocked_by = From, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _ ->
             loop(S#state{queue = [{From, sync} | S#state.queue]})
     end;
 handle({From, {truncate, Head, F, A}}, S) ->
-    case get(log) of
-        L when L#log.mode =:= read_only ->
-            reply(From, {error, {read_only_mode, L#log.name}}, S);
-        L when L#log.status =:= ok, S#state.cache_error =/= ok ->
+    case erlang:get(log) of
+        #log{mode = read_only, name = Name} ->
+            reply(From, {error, {read_only_mode, Name}}, S);
+        #log{status = ok} when S#state.cache_error =/= ok ->
             loop(cache_error(S, [From]));
-        L when L#log.status =:= ok ->
-            H = merge_head(Head, L#log.head),
+        #log{status = ok, head = V} = L ->
+            H = merge_head(Head, V),
             case catch do_trunc(L, H) of
                 ok ->
-                    erase(is_full),
+                    erlang:erase(is_full),
                     notify_owners({truncated, S#state.cnt}),
                     N = if Head =:= none -> 0; true -> 1 end,
                     reply(From, ok, (state_ok(S))#state{cnt = N});
                 Error ->
                     do_exit(S, From, Error, ?failure(Error, F, A))
             end;
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
-        L when L#log.blocked_by =:= From ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
+        #log{blocked_by = From, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _ ->
-            loop(S#state{queue = [{From, {truncate, Head, F, A}}
-                                  | S#state.queue]})
+            loop(S#state{queue = [{From, {truncate, Head, F, A}} | S#state.queue]})
     end;
 handle({From, {chunk, Pos, B, N}},  S) ->
-    case get(log) of
-        L when L#log.status =:= ok, S#state.cache_error =/= ok ->
+    case erlang:get(log) of
+        #log{status = ok} when S#state.cache_error =/= ok ->
             loop(cache_error(S, [From]));
-        L when L#log.status =:= ok ->
+        #log{status = ok} = L ->
             R = do_chunk(L, Pos, B, N),
             reply(From, R, S);
-        L when L#log.blocked_by =:= From ->
+        #log{blocked_by = From} = L ->
             R = do_chunk(L, Pos, B, N),
             reply(From, R, S);
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _L ->
             loop(S#state{queue = [{From, {chunk, Pos, B, N}} | S#state.queue]})
     end;
 handle({From, {chunk_step, Pos, N}},  S) ->
-    case get(log) of
-        L when L#log.status =:= ok, S#state.cache_error =/= ok ->
+    case erlang:get(log) of
+        #log{status = ok} when S#state.cache_error =/= ok ->
             loop(cache_error(S, [From]));
-        L when L#log.status =:= ok ->
+        #log{status = ok} = L ->
             R = do_chunk_step(L, Pos, N),
             reply(From, R, S);
-        L when L#log.blocked_by =:= From ->
+        #log{blocked_by = From} = L ->
             R = do_chunk_step(L, Pos, N),
             reply(From, R, S);
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _ ->
-            loop(S#state{queue = [{From, {chunk_step, Pos, N}}
-                                  | S#state.queue]})
+            loop(S#state{queue = [{From, {chunk_step, Pos, N}} | S#state.queue]})
     end;
 handle({From, {change_notify, Pid, NewNotify}}, S) ->
-    case get(log) of
-        L when L#log.status =:= ok ->
+    case erlang:get(log) of
+        #log{status = ok} = L ->
             case do_change_notify(L, Pid, NewNotify) of
                 {ok, L1} ->
-                    put(log, L1),
+                    erlang:put(log, L1),
                     reply(From, ok, S);
                 Error ->
                     reply(From, Error, S)
             end;
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
-        L when L#log.blocked_by =:= From ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
+        #log{blocked_by = From, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _ ->
-            loop(S#state{queue = [{From, {change_notify, Pid, NewNotify}}
-                                  | S#state.queue]})
+            loop(S#state{queue = [{From, {change_notify, Pid, NewNotify}} | S#state.queue]})
     end;
 handle({From, {change_header, NewHead}}, S) ->
-    case get(log) of
-        L when L#log.mode =:= read_only ->
-            reply(From, {error, {read_only_mode, L#log.name}}, S);
-        L when L#log.status =:= ok ->
-            case check_head(NewHead, L#log.format) of
+    case erlang:get(log) of
+        #log{mode = read_only, name = Name} ->
+            reply(From, {error, {read_only_mode, Name}}, S);
+        #log{status = ok, format = Format} = L ->
+            case check_head(NewHead, Format) of
                 {ok, Head} ->
-                    put(log, L#log{head = mk_head(Head, L#log.format)}),
+                    erlang:put(log, L#log{head = mk_head(Head, Format)}),
                     reply(From, ok, S);
                 Error ->
                     reply(From, Error, S)
             end;
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
-        L when L#log.blocked_by =:= From ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
+        #log{blocked_by = From, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _ ->
-            loop(S#state{queue = [{From, {change_header, NewHead}}
-                                  | S#state.queue]})
+            loop(S#state{queue = [{From, {change_header, NewHead}} | S#state.queue]})
     end;
 handle({From, {change_size, NewSize}}, S) ->
-    case get(log) of
-        L when L#log.mode =:= read_only ->
-            reply(From, {error, {read_only_mode, L#log.name}}, S);
-        L when L#log.status =:= ok ->
-            case check_size(L#log.type, NewSize) of
+    case erlang:get(log) of
+        #log{mode = read_only, name = Name} ->
+            reply(From, {error, {read_only_mode, Name}}, S);
+        #log{status = ok, name = Name, type = Type} = L ->
+            case check_size(Type, NewSize) of
                 ok ->
                     case catch do_change_size(L, NewSize) of % does the put
                         ok ->
                             reply(From, ok, S);
                         {big, CurSize} ->
-                            reply(From,
-                                  {error,
-                                   {new_size_too_small, L#log.name, CurSize}},
-                                  S);
+                            reply(From, {error, {new_size_too_small, Name, CurSize}}, S);
                         Else ->
                             reply(From, Else, state_err(S, Else))
                     end;
                 not_ok ->
                     reply(From, {error, {badarg, size}}, S)
             end;
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
-        L when L#log.blocked_by =:= From ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
+        #log{blocked_by = From, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _ ->
-            loop(S#state{queue = [{From, {change_size, NewSize}}
-                                  | S#state.queue]})
+            loop(S#state{queue = [{From, {change_size, NewSize}} | S#state.queue]})
     end;
 handle({From, inc_wrap_file}, S) ->
-    case get(log) of
-        L when L#log.mode =:= read_only ->
-            reply(From, {error, {read_only_mode, L#log.name}}, S);
-        L when L#log.type =:= halt ->
-            reply(From, {error, {halt_log, L#log.name}}, S);
-        L when L#log.status =:= ok, S#state.cache_error =/= ok ->
+    case erlang:get(log) of
+        #log{mode = read_only, name = Name} ->
+            reply(From, {error, {read_only_mode, Name}}, S);
+        #log{type = halt, name = Name} ->
+            reply(From, {error, {halt_log, Name}}, S);
+        #log{status = ok} when S#state.cache_error =/= ok ->
             loop(cache_error(S, [From]));
-        L when L#log.status =:= ok ->
+        #log{status = ok} = L ->
             case catch do_inc_wrap_file(L) of
                 {ok, L2, Lost} ->
-                    put(log, L2),
+                    erlang:put(log, L2),
                     notify_owners({wrap, Lost}),
                     reply(From, ok, S#state{cnt = S#state.cnt-Lost});
                 {error, Error, L2} ->
-                    put(log, L2),
+                    erlang:put(log, L2),
                     reply(From, Error, state_err(S, Error))
             end;
-        L when L#log.status =:= {blocked, false} ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
-        L when L#log.blocked_by =:= From ->
-            reply(From, {error, {blocked_log, L#log.name}}, S);
+        #log{status = {blocked, false}, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
+        #log{blocked_by = From, name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S);
         _ ->
             loop(S#state{queue = [{From, inc_wrap_file} | S#state.queue]})
     end;
 handle({From, {reopen, NewFile, Head, F, A}}, S) ->
-    case get(log) of
-        L when L#log.mode =:= read_only ->
-            reply(From, {error, {read_only_mode, L#log.name}}, S);
-        L when L#log.status =:= ok, S#state.cache_error =/= ok ->
+    case erlang:get(log) of
+        #log{mode = read_only, name = Name} ->
+            reply(From, {error, {read_only_mode, Name}}, S);
+        #log{status = ok} when S#state.cache_error =/= ok ->
             loop(cache_error(S, [From]));
-        L when L#log.status =:= ok, L#log.filename =/= NewFile  ->
+        #log{status = ok, filename = File, name = Name} = L when File =/= NewFile  ->
             case catch close_chronica_disk_log2(L) of
                 closed ->
-                    File = L#log.filename,
                     case catch rename_file(File, NewFile, L#log.type) of
                         ok ->
                             H = merge_head(Head, L#log.head),
-                            case do_open((S#state.args)#arg{name = L#log.name,
+                            case do_open((S#state.args)#arg{name = Name,
                                                             repair = truncate,
                                                             head = H,
                                                             file = File}) of
                                 {ok, Res, L2, Cnt} ->
-                                    put(log, L2#log{owners = L#log.owners,
+                                    erlang:put(log, L2#log{owners = L#log.owners,
                                                     head = L#log.head,
                                                     users = L#log.users}),
                                     notify_owners({truncated, S#state.cnt}),
-                                    erase(is_full),
+                                    erlang:erase(is_full),
                                     case Res of
                                         {error, _} ->
                                             do_exit(S, From, Res,
@@ -867,29 +853,29 @@ handle({From, {reopen, NewFile, Head, F, A}}, S) ->
                 Error ->
                     do_exit(S, From, Error, ?failure(Error, F, A))
             end;
-        L when L#log.status =:= ok ->
-            reply(From, {error, {same_file_name, L#log.name}}, S);
-        L ->
-            reply(From, {error, {blocked_log, L#log.name}}, S)
+        #log{status = ok, name = Name} ->
+            reply(From, {error, {same_file_name, Name}}, S);
+        #log{name = Name} ->
+            reply(From, {error, {blocked_log, Name}}, S)
     end;
 handle({Server, {internal_open, A}}, S) ->
-    case get(log) of
+    case erlang:get(log) of
         undefined ->
             case do_open(A) of % does the put
                 {ok, Res, L, Cnt} ->
-                    put(log, opening_pid(A#arg.linkto, A#arg.notify, L)),
+                    erlang:put(log, opening_pid(A#arg.linkto, A#arg.notify, L)),
                     reply(Server, Res, S#state{args=A, cnt=Cnt});
                 Res ->
                     do_fast_exit(S, Server, Res)
             end;
-        L ->
+        #log{head = Head, name = Name} = L ->
             TestH = mk_head(A#arg.head, A#arg.format),
-            case compare_arg(A#arg.options, S#state.args, TestH, L#log.head) of
+            case compare_arg(A#arg.options, S#state.args, TestH, Head) of
                 ok ->
                     case add_pid(A#arg.linkto, A#arg.notify, L) of
                         {ok, L1} ->
-                            put(log, L1),
-                            reply(Server, {ok, L#log.name}, S);
+                            erlang:put(log, L1),
+                            reply(Server, {ok, Name}, S);
                         Error ->
                             reply(Server, Error, S)
                     end;
@@ -906,28 +892,28 @@ handle({From, close}, S) ->
     end;
 handle({From, info}, S) ->
     reply(From, do_info(get(log), S#state.cnt), S);
-handle({'EXIT', From, Reason}, S) when From =:= S#state.parent ->
+handle({'EXIT', From, Reason}, #state{parent=From}=S) ->
     %% Parent orders shutdown.
-    _ = do_stop(S),
+    do_stop(S),
     exit(Reason);
-handle({'EXIT', From, Reason}, S) when From =:= S#state.server ->
+handle({'EXIT', From, Reason}, #state{server=From}=S) ->
     %% The server is gone.
-    _ = do_stop(S),
+    do_stop(S),
     exit(Reason);
 handle({'EXIT', From, _Reason}, S) ->
-    L = get(log),
+    L = erlang:get(log),
     case is_owner(From, L) of
         {true, _Notify} ->
             case close_owner(From, L, S) of
                 {stop, S1} ->
-                    _ = do_stop(S1),
+                    do_stop(S1),
                     exit(normal);
                 {continue, S1} ->
                     loop(S1)
             end;
         false ->
             %% 'users' is not decremented.
-            S1 = do_unblock(From, get(log), S),
+            S1 = do_unblock(From, erlang:get(log), S),
             loop(S1)
     end;
 handle({system, From, Req}, S) ->
@@ -939,28 +925,26 @@ sync_loop(From, S) ->
     log_loop(S, [], [], From).
 
 %% Inlined.
-log_loop(S, Pids, _Bins, _Sync) when S#state.cache_error =/= ok ->
-    loop(cache_error(S, Pids));
-log_loop(S, Pids, Bins, Sync) when S#state.messages =:= [] ->
+log_loop(#state{cache_error = ok, messages = []}=S, Pids, Bins, Sync) ->
     receive
         Message ->
-            log_loop(Message, Pids, Bins, Sync, S, get(log))
+            log_loop(Message, Pids, Bins, Sync, S, erlang:get(log))
     after 0 ->
-              loop(log_end(S, Pids, Bins, Sync))
+        loop(log_end(S, Pids, Bins, Sync))
     end;
-log_loop(S, Pids, Bins, Sync) ->
-    [M | Ms] = S#state.messages,
+log_loop(#state{cache_error = ok, messages = [M | Ms]}=S, Pids, Bins, Sync) ->
     S1 = S#state{messages = Ms},
-    log_loop(M, Pids, Bins, Sync, S1, get(log)).
+    log_loop(M, Pids, Bins, Sync, S1, erlang:get(log));
+log_loop(S, Pids, _Bins, _Sync) ->
+    loop(cache_error(S, Pids)).
 
 %% Items logged after the last sync request found are sync:ed as well.
-log_loop({alog, B}, Pids, Bins, Sync, S, L) when L#log.format =:= internal ->
+log_loop({alog, B}, Pids, Bins, Sync, S, #log{format = internal}) ->
     %% {alog, _} allowed for the internal format only.
     log_loop(S, Pids, [B | Bins], Sync);
 log_loop({balog, B}, Pids, Bins, Sync, S, _L) ->
     log_loop(S, Pids, [B | Bins], Sync);
-log_loop({From, {log, B}}, Pids, Bins, Sync, S, L)
-  when L#log.format =:= internal ->
+log_loop({From, {log, B}}, Pids, Bins, Sync, S, #log{format = internal}) ->
     %% {log, _} allowed for the internal format only.
     log_loop(S, [From | Pids], [B | Bins], Sync);
 log_loop({From, {blog, B}}, Pids, Bins, Sync, S, _L) ->
@@ -975,7 +959,7 @@ log_end(S, [], [], Sync) ->
     log_end_sync(S, Sync);
 log_end(S, Pids, Bins, Sync) ->
     case do_log(get(log), rflat(Bins)) of
-        N when is_integer(N) ->
+        N when erlang:is_integer(N) ->
             replies(Pids, ok),
             S1 = (state_ok(S))#state{cnt = S#state.cnt+N},
             log_end_sync(S1, Sync);
@@ -995,11 +979,11 @@ log_end_sync(S, Sync) ->
     state_err(S, Res).
 
 %% Inlined.
-rflat([B]=L) when is_binary(B) -> L;
+rflat([B]=L) when erlang:is_binary(B) -> L;
 rflat([B]) -> B;
 rflat(B) -> rflat(B, []).
 
-rflat([B | Bs], L) when is_binary(B) ->
+rflat([B | Bs], L) when erlang:is_binary(B) ->
     rflat(Bs, [B | L]);
 rflat([B | Bs], L) ->
     rflat(Bs, B ++ L);
@@ -1010,7 +994,7 @@ do_change_notify(L, Pid, Notify) ->
     case is_owner(Pid, L) of
         {true, Notify} ->
             {ok, L};
-        {true, _OldNotify} when Notify =/= true, Notify =/= false ->
+        {true, _OldNotify} when not erlang:is_boolean(Notify) ->
             {error, {badarg, notify}};
         {true, _OldNotify} ->
             Owners = lists:keydelete(Pid, 1, L#log.owners),
@@ -1022,7 +1006,7 @@ do_change_notify(L, Pid, Notify) ->
 
 %% -> {stop, S} | {continue, S}
 do_close(Pid, S) ->
-    L = get(log),
+    L = erlang:get(log),
     case is_owner(Pid, L) of
         {true, _Notify} ->
             close_owner(Pid, L, S);
@@ -1033,21 +1017,21 @@ do_close(Pid, S) ->
 %% -> {stop, S} | {continue, S}
 close_owner(Pid, L, S) ->
     L1 = L#log{owners = lists:keydelete(Pid, 1, L#log.owners)},
-    put(log, L1),
-    S2 = do_unblock(Pid, get(log), S),
+    erlang:put(log, L1),
+    S2 = do_unblock(Pid, erlang:get(log), S),
     unlink(Pid),
     do_close2(L1, S2).
 
 %% -> {stop, S} | {continue, S}
-close_user(Pid, L, S) when L#log.users > 0 ->
-    L1 = L#log{users = L#log.users - 1},
-    put(log, L1),
-    S2 = do_unblock(Pid, get(log), S),
+close_user(Pid, #log{users = U} = L, S) when U > 0 ->
+    L1 = L#log{users = U - 1},
+    erlang:put(log, L1),
+    S2 = do_unblock(Pid, erlang:get(log), S),
     do_close2(L1, S2);
 close_user(_Pid, _L, S) ->
     {continue, S}.
 
-do_close2(L, S) when L#log.users =:= 0, L#log.owners =:= [] ->
+do_close2(#log{users = 0, owners = []}, S) ->
     {stop, S};
 do_close2(_L, S) ->
     {continue, S}.
@@ -1060,7 +1044,7 @@ system_continue(_Parent, _, State) ->
 
 -spec system_terminate(_, _, _, #state{}) -> no_return().
 system_terminate(Reason, _Parent, _, State) ->
-    _ = do_stop(State),
+    do_stop(State),
     exit(Reason).
 
 %%-----------------------------------------------------------------
@@ -1082,15 +1066,15 @@ do_exit(S, From, Message0, Reason) ->
                   _ when Message0 =:= ok -> R;
                   _ -> Message0
               end,
-    _ = chronica_disk_log_server:close(self()),
+    chronica_disk_log_server:close(self()),
     replies(From, Message),
     ?PROFILE(ep:done()),
     exit(Reason).
 
 -spec do_fast_exit(#state{}, pid(), _) -> no_return().
 do_fast_exit(S, Server, Message) ->
-    _ = do_stop(S),
-    Server ! {chronica_disk_log, self(), Message},
+    do_stop(S),
+    Server ! {chronica_disk_log, erlang:self(), Message},
     exit(normal).
 
 %% -> closed | Error
@@ -1098,8 +1082,8 @@ do_stop(S) ->
     proc_q(S#state.queue ++ S#state.messages),
     close_chronica_disk_log(get(log)).
 
-proc_q([{From, _R}|Tail]) when is_pid(From) ->
-    From ! {chronica_disk_log, self(), {error, chronica_disk_log_stopped}},
+proc_q([{From, _R}|Tail]) when erlang:is_pid(From) ->
+    From ! {chronica_disk_log, erlang:self(), {error, chronica_disk_log_stopped}},
     proc_q(Tail);
 proc_q([_|T]) -> %% async stuff
     proc_q(T);
@@ -1112,13 +1096,13 @@ opening_pid(Pid, Notify, L) ->
     L1.
 
 %% -> {ok, log()} | Error
-add_pid(Pid, Notify, L) when is_pid(Pid) ->
+add_pid(Pid, Notify, L) when erlang:is_pid(Pid) ->
     case is_owner(Pid, L) of
         false ->
             link(Pid),
             {ok, L#log{owners = [{Pid, Notify} | L#log.owners]}};
         {true, Notify}  ->
-            %%{error, {pid_already_connected, L#log.name}};
+            %%{error, {pid_already_connected, Name}};
             {ok, L};
         {true, CurNotify} when Notify =/= CurNotify ->
             {error, {arg_mismatch, notify, CurNotify, Notify}}
@@ -1126,14 +1110,12 @@ add_pid(Pid, Notify, L) when is_pid(Pid) ->
 add_pid(_NotAPid, _Notify, L) ->
     {ok, L#log{users = L#log.users + 1}}.
 
-unblock_pid(L) when L#log.blocked_by =:= none ->
+unblock_pid(#log{blocked_by=none}) ->
     ok;
-unblock_pid(L) ->
-    case is_owner(L#log.blocked_by, L) of
-        {true, _Notify} ->
-            ok;
-        false ->
-            unlink(L#log.blocked_by)
+unblock_pid(#log{blocked_by=V}=L) ->
+    case is_owner(V, L) of
+        {true, _Notify} -> ok;
+        false -> unlink(V)
     end.
 
 %% -> true | false
@@ -1182,17 +1164,17 @@ compare_arg([{Attr, Val} | Tail], A, Head, OrigHead) ->
 
 -spec compare_arg(atom(), _, #arg{}) ->
     'ok' | {'not_ok', _} | {'error', {atom(), _}}.
-compare_arg(file, F, A) when F =/= A#arg.file ->
+compare_arg(file, F, #arg{file = V} = A) when F =/= V ->
     {error, {name_already_open, A#arg.name}};
-compare_arg(mode, read_only, A) when A#arg.mode =:= read_write ->
+compare_arg(mode, read_only, #arg{mode = read_write} = A) ->
     {error, {open_read_write, A#arg.name}};
-compare_arg(mode, read_write, A) when A#arg.mode =:= read_only ->
+compare_arg(mode, read_write, #arg{mode = read_only} = A) ->
     {error, {open_read_only, A#arg.name}};
-compare_arg(type, T, A) when T =/= A#arg.type ->
+compare_arg(type, T, #arg{type = V} = A) when T =/= V ->
     {not_ok, A#arg.type};
-compare_arg(format, F, A) when F =/= A#arg.format ->
+compare_arg(format, F, #arg{format = V} = A) when F =/= V ->
     {not_ok, A#arg.format};
-compare_arg(repair, R, A) when R =/= A#arg.repair ->
+compare_arg(repair, R, #arg{repair = V} = A) when R =/= V ->
     %% not used, but check it anyway...
     {not_ok, A#arg.repair};
 compare_arg(_Attr, _Val, _A) ->
@@ -1208,67 +1190,54 @@ do_open(A) ->
              version = A#arg.version},
     do_open2(L, A).
 
-mk_head({head, Term}, internal) -> {ok, term_to_binary(Term)};
+mk_head({head, Term}, internal) -> {ok, erlang:term_to_binary(Term)};
 mk_head({head, Bytes}, external) -> {ok, check_bytes(Bytes)};
 mk_head(H, _) -> H.
 
 terms2bins([T | Ts]) ->
-    [term_to_binary(T) | terms2bins(Ts)];
+    [erlang:term_to_binary(T) | terms2bins(Ts)];
 terms2bins([]) ->
     [].
 
-check_bytes_list([B | Bs], Bs0) when is_binary(B) ->
-    check_bytes_list(Bs, Bs0);
-check_bytes_list([], Bs0) ->
-    Bs0;
-check_bytes_list(_, Bs0) ->
-    check_bytes_list(Bs0).
+check_bytes_list(L) ->
+    [check_bytes(I) || I <- L].
 
-check_bytes_list([B | Bs]) when is_binary(B) ->
-    [B | check_bytes_list(Bs)];
-check_bytes_list([B | Bs]) ->
-    [list_to_binary(B) | check_bytes_list(Bs)];
-check_bytes_list([]) ->
-    [].
-
-check_bytes(Binary) when is_binary(Binary) ->
+check_bytes(Binary) when erlang:is_binary(Binary) ->
     Binary;
 check_bytes(Bytes) ->
-    list_to_binary(Bytes).
+    erlang:list_to_binary(Bytes).
 
 %%-----------------------------------------------------------------
 %% Change size of the logs in runtime.
 %%-----------------------------------------------------------------
 %% -> ok | {big, CurSize} | throw(Error)
-do_change_size(L, NewSize) when L#log.type =:= halt ->
-    Halt = L#log.extra,
+do_change_size(#log{type = halt, extra = Halt}=L, NewSize) ->
     CurB = Halt#halt.curB,
     NewLog = L#log{extra = Halt#halt{size = NewSize}},
     if
         NewSize =:= infinity ->
-            erase(is_full),
-            put(log, NewLog),
+            erlang:erase(is_full),
+            erlang:put(log, NewLog),
             ok;
         CurB =< NewSize ->
-            erase(is_full),
-            put(log, NewLog),
+            erlang:erase(is_full),
+            erlang:put(log, NewLog),
             ok;
         true ->
             {big, CurB}
     end;
-do_change_size(L, NewSize) when L#log.type =:= wrap ->
-    #log{extra = Extra, version = Version} = L,
+do_change_size(#log{type = wrap, extra = Extra, version = Version} = L, NewSize) ->
     {ok, Handle} = chronica_disk_log_1:change_size_wrap(Extra, NewSize, Version),
-    erase(is_full),
-    put(log, L#log{extra = Handle}),
+    erlang:erase(is_full),
+    erlang:put(log, L#log{extra = Handle}),
     ok.
 
 %% -> {ok, Head} | Error; Head = none | {head, H} | {M,F,A}
 check_head({head, none}, _Format) ->
     {ok, none};
-check_head({head_func, {M, F, A}}, _Format) when is_atom(M),
-                                                 is_atom(F),
-                                                 is_list(A) ->
+check_head({head_func, {M, F, A}}, _Format) when erlang:is_atom(M),
+                                                 erlang:is_atom(F),
+                                                 erlang:is_list(A) ->
     {ok, {M, F, A}};
 check_head({head, Head}, external) ->
     case catch check_bytes(Head) of
@@ -1283,10 +1252,10 @@ check_head(_Head, _Format) ->
     {error, {badarg, head}}.
 
 check_size(wrap, {NewMaxB, NewMaxF}) when
-      is_integer(NewMaxB), is_integer(NewMaxF),
+      erlang:is_integer(NewMaxB), erlang:is_integer(NewMaxF),
       NewMaxB > 0, NewMaxB =< ?MAX_BYTES, NewMaxF > 0, NewMaxF < ?MAX_FILES ->
     ok;
-check_size(halt, NewSize) when is_integer(NewSize), NewSize > 0 ->
+check_size(halt, NewSize) when erlang:is_integer(NewSize), NewSize > 0 ->
     ok;
 check_size(halt, infinity) ->
     ok;
@@ -1297,25 +1266,16 @@ check_size(_, _) ->
 %% Increment a wrap log.
 %%-----------------------------------------------------------------
 %% -> {ok, log(), Lost} | {error, Error, log()}
-do_inc_wrap_file(L) ->
-    #log{format = Format, extra = Handle} = L,
-    case Format of
-        internal ->
-            case chronica_disk_log_1:mf_int_inc(Handle, L#log.head) of
-                {ok, Handle2, Lost} ->
-                    {ok, L#log{extra = Handle2}, Lost};
-                {error, Error, Handle2} ->
-                    {error, Error, L#log{extra = Handle2}}
-            end;
-        external ->
-            case chronica_disk_log_1:mf_ext_inc(Handle, L#log.head) of
-                {ok, Handle2, Lost} ->
-                    {ok, L#log{extra = Handle2}, Lost};
-                {error, Error, Handle2} ->
-                    {error, Error, L#log{extra = Handle2}}
-            end
-    end.
-
+do_inc_wrap_file(#log{format = internal, extra = Handle, head = Head} = L) ->
+    R = chronica_disk_log_1:mf_int_inc(Handle, Head),
+    do_inc_wrap_file_(L, R);
+do_inc_wrap_file(#log{format = external, extra = Handle, head = Head} = L) ->
+    R = chronica_disk_log_1:mf_ext_inc(Handle, Head),
+    do_inc_wrap_file_(L, R).
+do_inc_wrap_file_(L, {ok, Handle, Lost}) ->
+    {ok, L#log{extra = Handle}, Lost};
+do_inc_wrap_file_(L, {error, Error, Handle}) ->
+    {error, Error, L#log{extra = Handle}}.
 
 %%-----------------------------------------------------------------
 %% Open a log file.
@@ -1340,15 +1300,12 @@ do_open2(L, #arg{type = halt, format = internal, name = Name,
 do_open2(L, #arg{type = wrap, format = internal, size = {MaxB, MaxF},
                  name = Name, repair = Repair, file = FName, mode = Mode,
                  version = V}) ->
-    case catch
-         chronica_disk_log_1:mf_int_open(FName, MaxB, MaxF, Repair, Mode, L#log.head, V) of
+    case catch chronica_disk_log_1:mf_int_open(FName, MaxB, MaxF, Repair, Mode, L#log.head, V) of
         {ok, Handle, Cnt} ->
-            {ok, {ok, Name}, L#log{type = wrap,
-                                   format_type = wrap_int,
-                                   extra = Handle}, Cnt};
+            {ok, {ok, Name}, L#log{type = wrap, format_type = wrap_int, extra = Handle}, Cnt};
         {repaired, Handle, Rec, Bad, Cnt} ->
             {ok, {repaired, Name, {recovered, Rec}, {badbytes, Bad}},
-             L#log{type = wrap, format_type = wrap_int, extra = Handle}, Cnt};
+            L#log{type = wrap, format_type = wrap_int, extra = Handle}, Cnt};
         Error ->
             Error
     end;
@@ -1366,13 +1323,9 @@ do_open2(L, #arg{type = halt, format = external, file = FName, name = Name,
 do_open2(L, #arg{type = wrap, format = external, size = {MaxB, MaxF},
                  name = Name, file = FName, repair = Repair, mode = Mode,
                  version = V}) ->
-    case catch
-         chronica_disk_log_1:mf_ext_open(FName, MaxB, MaxF, Repair, Mode, L#log.head, V) of
+    case catch chronica_disk_log_1:mf_ext_open(FName, MaxB, MaxF, Repair, Mode, L#log.head, V) of
         {ok, Handle, Cnt} ->
-            {ok, {ok, Name}, L#log{type = wrap,
-                                   format_type = wrap_ext,
-                                   extra = Handle,
-                                   format = external}, Cnt};
+            {ok, {ok, Name}, L#log{type = wrap, format_type = wrap_ext, extra = Handle, format = external}, Cnt};
         Error ->
             Error
     end.
@@ -1382,24 +1335,25 @@ close_chronica_disk_log(undefined) ->
     closed;
 close_chronica_disk_log(L) ->
     unblock_pid(L),
-    F = fun({Pid, _}) ->
-                unlink(Pid)
-        end,
+    F =
+    fun({Pid, _}) ->
+        unlink(Pid)
+    end,
     lists:foreach(F, L#log.owners),
     R = (catch close_chronica_disk_log2(L)),
-    erase(log),
+    erlang:erase(log),
     R.
 
 -spec close_chronica_disk_log2(#log{}) -> 'closed'. % | throw(Error)
 
 close_chronica_disk_log2(L) ->
     case L of
-        #log{format_type = halt_int, mode = Mode, extra = Halt} ->
-            chronica_disk_log_1:close(Halt#halt.fdc, L#log.filename, Mode);
+        #log{format_type = halt_int, mode = Mode, extra = Halt, filename = FN} ->
+            chronica_disk_log_1:close(Halt#halt.fdc, FN, Mode);
         #log{format_type = wrap_int, mode = Mode, extra = Handle} ->
             chronica_disk_log_1:mf_int_close(Handle, Mode);
-        #log{format_type = halt_ext, extra = Halt} ->
-            chronica_disk_log_1:fclose(Halt#halt.fdc, L#log.filename);
+        #log{format_type = halt_ext, extra = Halt, filename = FN} ->
+            chronica_disk_log_1:fclose(Halt#halt.fdc, FN);
         #log{format_type = wrap_ext, mode = Mode, extra = Handle} ->
             chronica_disk_log_1:mf_ext_close(Handle, Mode)
     end,
@@ -1519,7 +1473,7 @@ do_info(L, Cnt) ->
                          noFull = NoFull, accFull = AccFull} = Extra,
                  NewAccFull = AccFull + NoFull,
                  NewExtra = Extra#handle{noFull = 0, accFull = NewAccFull},
-                 put(log, L#log{extra = NewExtra}),
+                 erlang:put(log, L#log{extra = NewExtra}),
                  [{no_current_bytes, CurB},
                   {no_current_items, CurCnt},
                   {no_items, Cnt},
@@ -1528,7 +1482,7 @@ do_info(L, Cnt) ->
                   {no_overflows, {NewAccFull, NoFull}}
                  ];
              halt when Mode =:= read_write ->
-                 IsFull = case get(is_full) of
+                 IsFull = case erlang:get(is_full) of
                               undefined -> false;
                               _ -> true
                           end,
@@ -1555,14 +1509,14 @@ do_info(L, Cnt) ->
     HeadL ++
     [{mode, Mode},
      {status, Status},
-     {node, node()},
+     {node, erlang:node()},
      {distributed, Distribution}
     ],
     Common ++ RW.
 
 do_block(Pid, QueueLogRecs, L) ->
     L2 = L#log{status = {blocked, QueueLogRecs}, blocked_by = Pid},
-    put(log, L2),
+    erlang:put(log, L2),
     case is_owner(Pid, L2) of
         {true, _Notify} ->
             ok;
@@ -1570,7 +1524,7 @@ do_block(Pid, QueueLogRecs, L) ->
             link(Pid)
     end.
 
-do_unblock(Pid, L, S) when L#log.blocked_by =:= Pid ->
+do_unblock(Pid, #log{blocked_by=Pid}=L, S) ->
     do_unblock(L, S);
 do_unblock(_Pid, _L, S) ->
     S.
@@ -1578,7 +1532,7 @@ do_unblock(_Pid, _L, S) ->
 do_unblock(L, S) ->
     unblock_pid(L),
     L2 = L#log{blocked_by = none, status = ok},
-    put(log, L2),
+    erlang:put(log, L2),
     %% Since the block request is synchronous, and the blocking
     %% process is the only process that can unblock, all requests in
     %% 'messages' will have been put in 'queue' before the unblock
@@ -1588,42 +1542,41 @@ do_unblock(L, S) ->
 
 -spec do_log(#log{}, [binary()]) -> integer() | {'error', _, integer()}.
 
-do_log(L, B) when L#log.type =:= halt ->
-    #log{format = Format, extra = Halt} = L,
+do_log(#log{type = halt, format = Format, extra = Halt, name = Name}=L, B) ->
     #halt{curB = CurSize, size = Sz} = Halt,
     {Bs, BSize} = bsize(B, Format),
-    case get(is_full) of
+    case erlang:get(is_full) of
         true ->
-            {error, {error, {full, L#log.name}}, 0};
+            {error, {error, {full, Name}}, 0};
         undefined when Sz =:= infinity; CurSize + BSize =< Sz ->
             halt_write(Halt, L, B, Bs, BSize);
         undefined ->
             halt_write_full(L, B, Format, 0)
     end;
-do_log(L, B) when L#log.format_type =:= wrap_int ->
-    case chronica_disk_log_1:mf_int_log(L#log.extra, B, L#log.head) of
+do_log(#log{format_type = wrap_int, extra = Extra, head=Head}=L, B) ->
+    case chronica_disk_log_1:mf_int_log(Extra, B, Head) of
         {ok, Handle, Logged, Lost, Wraps} ->
             notify_owners_wrap(Wraps),
-            put(log, L#log{extra = Handle}),
+            erlang:put(log, L#log{extra = Handle}),
             Logged - Lost;
         {ok, Handle, Logged} ->
-            put(log, L#log{extra = Handle}),
+            erlang:put(log, L#log{extra = Handle}),
             Logged;
         {error, Error, Handle, Logged, Lost} ->
-            put(log, L#log{extra = Handle}),
+            erlang:put(log, L#log{extra = Handle}),
             {error, Error, Logged - Lost}
     end;
-do_log(L, B) when L#log.format_type =:= wrap_ext ->
-    case chronica_disk_log_1:mf_ext_log(L#log.extra, B, L#log.head) of
+do_log(#log{format_type = wrap_ext, extra = Extra, head=Head}=L, B) ->
+    case chronica_disk_log_1:mf_ext_log(Extra, B, Head) of
         {ok, Handle, Logged, Lost, Wraps} ->
             notify_owners_wrap(Wraps),
-            put(log, L#log{extra = Handle}),
+            erlang:put(log, L#log{extra = Handle}),
             Logged - Lost;
         {ok, Handle, Logged} ->
-            put(log, L#log{extra = Handle}),
+            erlang:put(log, L#log{extra = Handle}),
             Logged;
         {error, Error, Handle, Logged, Lost} ->
-            put(log, L#log{extra = Handle}),
+            erlang:put(log, L#log{extra = Handle}),
             {error, Error, Logged - Lost}
     end.
 
@@ -1643,7 +1596,7 @@ halt_write_full(L, [Bin | Bins], Format, N) ->
     if
         CurSize + BSize =< Sz ->
             case halt_write(Halt, L, B, Bs, BSize) of
-                N1 when is_integer(N1) ->
+                N1 when erlang:is_integer(N1) ->
                     halt_write_full(get(log), Bins, Format, N+N1);
                 Error ->
                     Error
@@ -1651,49 +1604,48 @@ halt_write_full(L, [Bin | Bins], Format, N) ->
         true ->
             halt_write_full(L, [], Format, N)
     end;
-halt_write_full(L, _Bs, _Format, N) ->
-    put(is_full, true),
+halt_write_full(#log{name = Name}, _Bs, _Format, N) ->
+    erlang:put(is_full, true),
     notify_owners(full),
-    {error, {error, {full, L#log.name}}, N}.
+    {error, {error, {full, Name}}, N}.
 
 halt_write(Halt, L, B, Bs, BSize) ->
     case chronica_disk_log_1:fwrite(Halt#halt.fdc, L#log.filename, Bs, BSize) of
         {ok, NewFdC} ->
             NCurB = Halt#halt.curB + BSize,
             NewHalt = Halt#halt{fdc = NewFdC, curB = NCurB},
-            put(log, L#log{extra = NewHalt}),
+            erlang:put(log, L#log{extra = NewHalt}),
             length(B);
         {Error, NewFdC} ->
-            put(log, L#log{extra = Halt#halt{fdc = NewFdC}}),
+            erlang:put(log, L#log{extra = Halt#halt{fdc = NewFdC}}),
             {error, Error, 0}
     end.
 
 %% -> ok | Error
 do_write_cache(#log{filename = FName, type = halt, extra = Halt} = Log) ->
     {Reply, NewFdC} = chronica_disk_log_1:write_cache(Halt#halt.fdc, FName),
-    put(log, Log#log{extra = Halt#halt{fdc = NewFdC}}),
+    erlang:put(log, Log#log{extra = Halt#halt{fdc = NewFdC}}),
     Reply;
 do_write_cache(#log{type = wrap, extra = Handle} = Log) ->
     {Reply, NewHandle} = chronica_disk_log_1:mf_write_cache(Handle),
-    put(log, Log#log{extra = NewHandle}),
+    erlang:put(log, Log#log{extra = NewHandle}),
     Reply.
 
 %% -> ok | Error
 do_sync(#log{filename = FName, type = halt, extra = Halt} = Log) ->
     {Reply, NewFdC} = chronica_disk_log_1:sync(Halt#halt.fdc, FName),
-    put(log, Log#log{extra = Halt#halt{fdc = NewFdC}}),
+    erlang:put(log, Log#log{extra = Halt#halt{fdc = NewFdC}}),
     Reply;
 do_sync(#log{type = wrap, extra = Handle} = Log) ->
     {Reply, NewHandle} = chronica_disk_log_1:mf_sync(Handle),
-    put(log, Log#log{extra = NewHandle}),
+    erlang:put(log, Log#log{extra = NewHandle}),
     Reply.
 
 %% -> ok | Error | throw(Error)
-do_trunc(L, Head) when L#log.type =:= halt ->
-    #log{filename = FName, extra = Halt} = L,
+do_trunc(#log{type = halt, filename = FName, extra = Halt, format = Format} = L, Head) ->
     FdC = Halt#halt.fdc,
     {Reply1, FdC2} =
-    case L#log.format of
+    case Format of
         internal ->
             chronica_disk_log_1:truncate(FdC, FName, Head);
         external ->
@@ -1716,11 +1668,9 @@ do_trunc(L, Head) when L#log.type =:= halt ->
         {ok, NewFdC, _} ->
             {Reply1, Halt#halt{fdc = NewFdC}}
     end,
-    put(log, L#log{extra = NewHalt}),
+    erlang:put(log, L#log{extra = NewHalt}),
     Reply;
-do_trunc(L, Head) when L#log.type =:= wrap ->
-    Handle = L#log.extra,
-    OldHead = L#log.head,
+do_trunc(#log{type = wrap, extra = Handle, head = OldHead} = L, Head) ->
     {MaxB, MaxF} = chronica_disk_log_1:get_wrap_size(Handle),
     ok = do_change_size(L, {MaxB, 1}),
     NewLog = trunc_wrap((get(log))#log{head = Head}),
@@ -1738,25 +1688,24 @@ trunc_wrap(L) ->
             throw(Error)
     end.
 
-do_chunk(#log{format_type = halt_int, extra = Halt} = L, Pos, B, N) ->
+do_chunk(#log{format_type = halt_int, extra = Halt, mode=Mode} = L, Pos, B, N) ->
     FdC = Halt#halt.fdc,
     {NewFdC, Reply} =
-    case L#log.mode of
+    case Mode of
         read_only ->
             chronica_disk_log_1:chunk_read_only(FdC, L#log.filename, Pos, B, N);
         read_write ->
             chronica_disk_log_1:chunk(FdC, L#log.filename, Pos, B, N)
     end,
-    put(log, L#log{extra = Halt#halt{fdc = NewFdC}}),
+    erlang:put(log, L#log{extra = Halt#halt{fdc = NewFdC}}),
     Reply;
-do_chunk(#log{format_type = wrap_int, mode = read_only,
-              extra = Handle} = Log, Pos, B, N) ->
+do_chunk(#log{format_type = wrap_int, mode = read_only, extra = Handle} = Log, Pos, B, N) ->
     {NewHandle, Reply} = chronica_disk_log_1:mf_int_chunk_read_only(Handle, Pos, B, N),
-    put(log, Log#log{extra = NewHandle}),
+    erlang:put(log, Log#log{extra = NewHandle}),
     Reply;
 do_chunk(#log{format_type = wrap_int, extra = Handle} = Log, Pos, B, N) ->
     {NewHandle, Reply} = chronica_disk_log_1:mf_int_chunk(Handle, Pos, B, N),
-    put(log, Log#log{extra = NewHandle}),
+    erlang:put(log, Log#log{extra = NewHandle}),
     Reply;
 do_chunk(Log, _Pos, _B, _) ->
     {error, {format_external, Log#log.name}}.
@@ -1768,10 +1717,10 @@ do_chunk_step(Log, _Pos, _N) ->
 
 %% Inlined.
 replies(Pids, Reply) ->
-    M = {chronica_disk_log, self(), Reply},
+    M = {chronica_disk_log, erlang:self(), Reply},
     send_reply(Pids, M).
 
-send_reply(Pid, M) when is_pid(Pid) ->
+send_reply(Pid, M) when erlang:is_pid(Pid) ->
     Pid ! M;
 send_reply([Pid | Pids], M) ->
     Pid ! M,
@@ -1780,7 +1729,7 @@ send_reply([], _M) ->
     ok.
 
 reply(To, Reply, S) ->
-    To ! {chronica_disk_log, self(), Reply},
+    To ! {chronica_disk_log, erlang:self(), Reply},
     loop(S).
 
 req(Log, R) ->
@@ -1816,7 +1765,7 @@ multi_req(Msg, Pids) ->
                 end, {error, nonode}, Refs).
 
 sreq(Log, R) ->
-    case nearby_pid(Log, node()) of
+    case nearby_pid(Log, erlang:node()) of
         undefined ->
             {error, no_such_log};
         Pid ->
@@ -1826,7 +1775,7 @@ sreq(Log, R) ->
 %% Local req - always talk to log on Node
 lreq(Log, R, Node) ->
     case nearby_pid(Log, Node) of
-        Pid when is_pid(Pid), node(Pid) =:= Node ->
+        Pid when erlang:is_pid(Pid), erlang:node(Pid) =:= Node ->
             monitor_request(Pid, R);
         _Else ->
             {error, no_such_log}
@@ -1842,8 +1791,8 @@ nearby_pid(Log, Node) ->
             get_near_pid(Pids, Node)
     end.
 
--spec get_near_pid([pid(), ...], node()) -> pid().
-get_near_pid([Pid | _], Node) when node(Pid) =:= Node -> Pid;
+-spec get_near_pid([pid(), ...], erlang:node()) -> pid().
+get_near_pid([Pid | _], Node) when erlang:node(Pid) =:= Node -> Pid;
 get_near_pid([Pid], _ ) -> Pid;
 get_near_pid([_ | T], Node) -> get_near_pid(T, Node).
 
@@ -1913,8 +1862,8 @@ notify_owners_wrap([N | Wraps]) ->
     notify_owners_wrap(Wraps).
 
 notify_owners(Note) ->
-    L = get(log),
-    Msg = {chronica_disk_log, node(), L#log.name, Note},
+    L = erlang:get(log),
+    Msg = {chronica_disk_log, erlang:node(), L#log.name, Note},
     lists:foreach(fun({Pid, true}) -> Pid ! Msg;
                      (_) -> ok
                   end, L#log.owners).
@@ -1929,7 +1878,7 @@ state_ok(S) ->
 
 -spec state_err(#state{}, dlog_state_error()) -> #state{}.
 
-state_err(S, Err) when S#state.error_status =:= Err -> S;
+state_err(#state{error_status = Err} = S, Err) -> S;
 state_err(S, Err) ->
     notify_owners({error_status, Err}),
     S#state{error_status = Err}.

@@ -14,8 +14,7 @@
 -include_lib("pt_scripts/include/pt_macro.hrl").
 -include("chronica_config.hrl").
 
--export(
-   [
+-export([
     clear_log/1,
     clear_log/0,
     activate/0,
@@ -25,7 +24,7 @@
     register/0,
     load_config/1,
     get_tty_config/0
-   ]).
+    ]).
 
 
 -spec register() -> ok | {error, term()}.
@@ -92,21 +91,20 @@ load_config(Config) ->
     end.
 
 get_tty_config() ->
-    #chronica_config
-        {
-            rules = [#chronica_rule{mask = '*', priority = info, flow_ids = [default]}],
-            flows = [#chronica_flow{flow_id = default, backends = [#chronica_backend{type = tty, format = default}]}],
-            formats = [],
-            active = true,
-            detail_info = false,
-            rotate_at_start = false,
-            internal_logger = [{tty, warning}],
-            log_root = "./log/",
-            data_root = "./cache/",
-            max_file_size = 1024*1024*10,
-            max_file_num = 10,
-            tty_enabled = true,
-            tcp_port = undefined,
-            tcp_host = any,
-            backend_modules = []
+    #chronica_config{
+        rules = [#chronica_rule{mask = '*', priority = info, flow_ids = [default]}],
+        flows = [#chronica_flow{flow_id = default, backends = [#chronica_backend{type = tty, format = default}]}],
+        formats = [],
+        active = true,
+        detail_info = false,
+        rotate_at_start = false,
+        internal_logger = [{tty, warning}],
+        log_root = "./log/",
+        data_root = "./cache/",
+        max_file_size = 1024*1024*10,
+        max_file_num = 10,
+        tty_enabled = true,
+        tcp_port = undefined,
+        tcp_host = any,
+        backend_modules = []
         }.

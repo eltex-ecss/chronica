@@ -11,14 +11,17 @@
 -include("chronica_int.hrl").
 -include_lib("pt_scripts/include/pt_macro.hrl").
 
--export([log_it/10, format_sys_dbg/3]).
+-export([
+    log_it/10,
+    format_sys_dbg/3
+    ]).
 
 log_it(_Priority, _NowTime, _Format, _Args, _Module, _Line, _File, _Function, _Pid, _Flow = []) ->
     ok;
 log_it(Priority, NowTime, Format, Args, Module, Line, File, Function, Pid, Flow) ->
     try
         {Date, Time} = calendar:now_to_local_time(NowTime),
-        Mk = element(3, NowTime),
+        Mk = erlang:element(3, NowTime),
         put_to_outputs({{Date, Time, Mk}, Priority, Module, Pid, Line, File, Function, Format, Args}, default, Flow)
     catch
         C:E ->

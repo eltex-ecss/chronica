@@ -8,26 +8,26 @@
 -module(log).
 
 -export([
-         debug/1,
-         debug/2,
-         debug/3,
-         info/1,
-         info/2,
-         info/3,
-         todo/1,
-         todo/2,
-         todo/3,
-         trace/1,
-         trace/2,
-         trace/3,
-         warning/1,
-         warning/2,
-         warning/3,
-         error/1,
-         error/2,
-         error/3,
-         log/6
-        ]).
+    debug/1,
+    debug/2,
+    debug/3,
+    info/1,
+    info/2,
+    info/3,
+    todo/1,
+    todo/2,
+    todo/3,
+    trace/1,
+    trace/2,
+    trace/3,
+    warning/1,
+    warning/2,
+    warning/3,
+    error/1,
+    error/2,
+    error/3,
+    log/6
+    ]).
 
 debug(_) -> ok.
 debug(_, _) -> ok.

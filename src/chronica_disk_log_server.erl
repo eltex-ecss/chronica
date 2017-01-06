@@ -268,7 +268,7 @@ do_internal_open(Name, Pid, From, {open, _W, A}=Req, Attach, State) ->
                 Res = chronica_disk_log:internal_open(Pid, A),
                 Server ! {pending_reply, Pid, Res}
         end,
-    _ = spawn(F),
+    spawn(F),
     PD = #pending{log = Name, pid = Pid, req = Req,
                   from = From, attach = Attach, clients = []},
     P = [PD | State#state.pending],

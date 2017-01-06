@@ -8,12 +8,15 @@
 %%%-------------------------------------------------------------------
 -module(chronica_format_creator).
 
+-compile(inline_list_funcs).
+-compile(inline).
+
 -export([
-         reload_formats/2,
-         create_format_function/3,
-         frame/1,
-         insert_tab/1
-        ]).
+    reload_formats/2,
+    create_format_function/3,
+    frame/1,
+    insert_tab/1
+    ]).
 
 -include("chronica_int.hrl").
 -include("chronica_config.hrl").
@@ -72,25 +75,25 @@ create_format_function(FunName, UserFormat,
 
 priority_color(FunColor) ->
     "Get_priority_short_prefix =
-        fun(1) -> <<" ++ FunColor({'Error', "\"*** ERROR\""}) ++ ">>;
-           (2) -> <<" ++ FunColor({'Warning', "\"W\""}) ++ ">>;
-           (3) -> <<" ++ FunColor({'Info', "\"I\""}) ++ ">>;
-           (4) -> <<" ++ FunColor({'Trace', "\"T\""}) ++ ">>;
-           (5) -> <<" ++ FunColor({'Debug', "\"D\""}) ++ ">> end,
+        fun(?P_ERROR) -> <<" ++ FunColor({'Error', "\"*** ERROR\""}) ++ ">>;
+           (?P_WARNING) -> <<" ++ FunColor({'Warning', "\"W\""}) ++ ">>;
+           (?P_INFO) -> <<" ++ FunColor({'Info', "\"I\""}) ++ ">>;
+           (?P_TRACE) -> <<" ++ FunColor({'Trace', "\"T\""}) ++ ">>;
+           (?P_DEBUG) -> <<" ++ FunColor({'Debug', "\"D\""}) ++ ">> end,
 
     Get_priority_prefix_up =
-        fun(1) -> <<" ++ FunColor({'Error', "\"ERROR\""}) ++ ">>;
-           (2) -> <<" ++ FunColor({'Warning', "\"WARN \""}) ++ ">>;
-           (3) -> <<" ++ FunColor({'Info', "\"INFO \""}) ++ ">>;
-           (4) -> <<" ++ FunColor({'Trace', "\"TRACE\""}) ++ ">>;
-           (5) -> <<" ++ FunColor({'Debug', "\"DEBUG\""}) ++ ">> end,
+        fun(?P_ERROR) -> <<" ++ FunColor({'Error', "\"ERROR\""}) ++ ">>;
+           (?P_WARNING) -> <<" ++ FunColor({'Warning', "\"WARN \""}) ++ ">>;
+           (?P_INFO) -> <<" ++ FunColor({'Info', "\"INFO \""}) ++ ">>;
+           (?P_TRACE) -> <<" ++ FunColor({'Trace', "\"TRACE\""}) ++ ">>;
+           (?P_DEBUG) -> <<" ++ FunColor({'Debug', "\"DEBUG\""}) ++ ">> end,
 
     Get_priority_prefix_low =
-        fun(1) -> <<" ++ FunColor({'Error', "\"error\""}) ++ ">>;
-           (2) -> <<" ++ FunColor({'Warning', "\"warning\""}) ++ ">>;
-           (3) -> <<" ++ FunColor({'Info', "\"info\""}) ++ ">>;
-           (4) -> <<" ++ FunColor({'Trace', "\"trace\""}) ++ ">>;
-           (5) -> <<" ++ FunColor({'Debug', "\"debug\""}) ++ ">> end, ".
+        fun(?P_ERROR) -> <<" ++ FunColor({'Error', "\"error\""}) ++ ">>;
+           (?P_WARNING) -> <<" ++ FunColor({'Warning', "\"warning\""}) ++ ">>;
+           (?P_INFO) -> <<" ++ FunColor({'Info', "\"info\""}) ++ ">>;
+           (?P_TRACE) -> <<" ++ FunColor({'Trace', "\"trace\""}) ++ ">>;
+           (?P_DEBUG) -> <<" ++ FunColor({'Debug', "\"debug\""}) ++ ">> end, ".
 
 make_format_function_ast([], BinaryStr, StrAST, _FunColor, _FlagColor) ->
     {BinaryStr ++ ">>.", StrAST};
@@ -181,7 +184,7 @@ make_format_function_ast([Args = 'Line' | Res], BinaryStr, StrAST, FunColor, Fla
                              StrAST ++ NewStrAST, FunColor, FlagColor);
 make_format_function_ast([Args = 'Module' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->
     NewBinaryStr = FunColor({Args, "Module_binary/binary"}),
-    NewStrAST = "Module_binary = erlang:list_to_binary(erlang:atom_to_list(Module)), ",
+    NewStrAST = "Module_binary = erlang:atom_to_binary(Module, latin1), ",
     make_format_function_ast(Res, BinaryStr ++ NewBinaryStr ++ theend(Res),
                              StrAST ++ NewStrAST, FunColor, FlagColor);
 make_format_function_ast([Args = 'Function' | Res], BinaryStr, StrAST, FunColor, FlagColor) ->

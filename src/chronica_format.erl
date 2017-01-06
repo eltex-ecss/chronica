@@ -9,13 +9,16 @@
 -module(chronica_format).
 
 -export([
-         default/1,
-         binary/1,
-         month_str_binary/1,
-         get_priority_short_prefix/1,
-         get_priority_prefix_up/1,
-         get_priority_prefix_low/1
-        ]).
+    default/1,
+    binary/1,
+    month_str_binary/1,
+    get_priority_short_prefix/1,
+    get_priority_prefix_up/1,
+    get_priority_prefix_low/1
+    ]).
+
+-compile(inline_list_funcs).
+-compile(inline).
 
 -include_lib("pt_scripts/include/pt_recompilable.hrl").
 -include("chronica_int.hrl").
@@ -46,25 +49,25 @@ default({{{Year, Month, Day}, {Hour, Minute, Second}, Millisecond},
     ":",  " ", Message_binary/binary, "\n" >>.
 
 binary(Msg) ->
-    term_to_binary(Msg).
+    erlang:term_to_binary(Msg).
 
-get_priority_short_prefix(1) -> <<"*** ERROR">>;
-get_priority_short_prefix(2) -> <<"W">>;
-get_priority_short_prefix(3) -> <<"I">>;
-get_priority_short_prefix(4) -> <<"T">>;
-get_priority_short_prefix(5) -> <<"D">>.
+get_priority_short_prefix(?P_ERROR) -> <<"*** ERROR">>;
+get_priority_short_prefix(?P_WARNING) -> <<"W">>;
+get_priority_short_prefix(?P_INFO) -> <<"I">>;
+get_priority_short_prefix(?P_TRACE) -> <<"T">>;
+get_priority_short_prefix(?P_DEBUG) -> <<"D">>.
 
-get_priority_prefix_up(1) -> <<"ERROR">>;
-get_priority_prefix_up(2) -> <<"WARN ">>;
-get_priority_prefix_up(3) -> <<"INFO ">>;
-get_priority_prefix_up(4) -> <<"TRACE">>;
-get_priority_prefix_up(5) -> <<"DEBUG">>.
+get_priority_prefix_up(?P_ERROR) -> <<"ERROR">>;
+get_priority_prefix_up(?P_WARNING) -> <<"WARN ">>;
+get_priority_prefix_up(?P_INFO) -> <<"INFO ">>;
+get_priority_prefix_up(?P_TRACE) -> <<"TRACE">>;
+get_priority_prefix_up(?P_DEBUG) -> <<"DEBUG">>.
 
-get_priority_prefix_low(1) -> <<"error">>;
-get_priority_prefix_low(2) -> <<"warning">>;
-get_priority_prefix_low(3) -> <<"info">>;
-get_priority_prefix_low(4) -> <<"trace">>;
-get_priority_prefix_low(5) -> <<"debug">>.
+get_priority_prefix_low(?P_ERROR) -> <<"error">>;
+get_priority_prefix_low(?P_WARNING) -> <<"warning">>;
+get_priority_prefix_low(?P_INFO) -> <<"info">>;
+get_priority_prefix_low(?P_TRACE) -> <<"trace">>;
+get_priority_prefix_low(?P_DEBUG) -> <<"debug">>.
 
 msecond_binary(N) when N < 10 ->
     <<"00000", (erlang:integer_to_binary(N))/binary>>;
