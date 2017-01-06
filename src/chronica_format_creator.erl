@@ -75,25 +75,25 @@ create_format_function(FunName, UserFormat,
 
 priority_color(FunColor) ->
     "Get_priority_short_prefix =
-        fun(?P_ERROR) -> <<" ++ FunColor({'Error', "\"*** ERROR\""}) ++ ">>;
-           (?P_WARNING) -> <<" ++ FunColor({'Warning', "\"W\""}) ++ ">>;
-           (?P_INFO) -> <<" ++ FunColor({'Info', "\"I\""}) ++ ">>;
-           (?P_TRACE) -> <<" ++ FunColor({'Trace', "\"T\""}) ++ ">>;
-           (?P_DEBUG) -> <<" ++ FunColor({'Debug', "\"D\""}) ++ ">> end,
+        fun(1) -> <<" ++ FunColor({'Error', "\"*** ERROR\""}) ++ ">>;
+           (2) -> <<" ++ FunColor({'Warning', "\"W\""}) ++ ">>;
+           (3) -> <<" ++ FunColor({'Info', "\"I\""}) ++ ">>;
+           (4) -> <<" ++ FunColor({'Trace', "\"T\""}) ++ ">>;
+           (5) -> <<" ++ FunColor({'Debug', "\"D\""}) ++ ">> end,
 
     Get_priority_prefix_up =
-        fun(?P_ERROR) -> <<" ++ FunColor({'Error', "\"ERROR\""}) ++ ">>;
-           (?P_WARNING) -> <<" ++ FunColor({'Warning', "\"WARN \""}) ++ ">>;
-           (?P_INFO) -> <<" ++ FunColor({'Info', "\"INFO \""}) ++ ">>;
-           (?P_TRACE) -> <<" ++ FunColor({'Trace', "\"TRACE\""}) ++ ">>;
-           (?P_DEBUG) -> <<" ++ FunColor({'Debug', "\"DEBUG\""}) ++ ">> end,
+        fun(1) -> <<" ++ FunColor({'Error', "\"ERROR\""}) ++ ">>;
+           (2) -> <<" ++ FunColor({'Warning', "\"WARN \""}) ++ ">>;
+           (3) -> <<" ++ FunColor({'Info', "\"INFO \""}) ++ ">>;
+           (4) -> <<" ++ FunColor({'Trace', "\"TRACE\""}) ++ ">>;
+           (5) -> <<" ++ FunColor({'Debug', "\"DEBUG\""}) ++ ">> end,
 
     Get_priority_prefix_low =
-        fun(?P_ERROR) -> <<" ++ FunColor({'Error', "\"error\""}) ++ ">>;
-           (?P_WARNING) -> <<" ++ FunColor({'Warning', "\"warning\""}) ++ ">>;
-           (?P_INFO) -> <<" ++ FunColor({'Info', "\"info\""}) ++ ">>;
-           (?P_TRACE) -> <<" ++ FunColor({'Trace', "\"trace\""}) ++ ">>;
-           (?P_DEBUG) -> <<" ++ FunColor({'Debug', "\"debug\""}) ++ ">> end, ".
+        fun(1) -> <<" ++ FunColor({'Error', "\"error\""}) ++ ">>;
+           (2) -> <<" ++ FunColor({'Warning', "\"warning\""}) ++ ">>;
+           (3) -> <<" ++ FunColor({'Info', "\"info\""}) ++ ">>;
+           (4) -> <<" ++ FunColor({'Trace', "\"trace\""}) ++ ">>;
+           (5) -> <<" ++ FunColor({'Debug', "\"debug\""}) ++ ">> end, ".
 
 make_format_function_ast([], BinaryStr, StrAST, _FunColor, _FlagColor) ->
     {BinaryStr ++ ">>.", StrAST};
