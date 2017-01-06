@@ -138,7 +138,7 @@ time(56) -> <<"56">>;
 time(57) -> <<"57">>;
 time(58) -> <<"58">>;
 time(59) -> <<"59">>;
-time(N) -> erlang:list_to_binary(erlang:integer_to_list(N)).
+time(N) -> erlang:integer_to_binary(N).
 
 month_str_binary(1)  -> <<"Jan">>;
 month_str_binary(2)  -> <<"Feb">>;
@@ -239,4 +239,4 @@ year_binary(2097) -> <<"2097">>;
 year_binary(2098) -> <<"2098">>;
 year_binary(2099) -> <<"2099">>;
 year_binary(2100) -> <<"2100">>;
-year_binary(N) -> erlang:list_to_binary(erlang:integer_to_list(N)).
+year_binary(N) -> erlang:integer_to_binary(N).
