@@ -1418,9 +1418,9 @@ add_application_in_cache(App, RApps, Rules, Cache, Detail_info, TickFun) ->
                 AppModulesCode = case Detail_info of
                     true ->
                         io:format("Compiling the cache: [~p] ", [App]),
-                        T1 = erlang:system_time(milli_seconds),
+                        T1 = erlang:system_time(millisecond),
                         Apps = generate_app_iface_modules(App, Rules),
-                        T2 = erlang:system_time(milli_seconds),
+                        T2 = erlang:system_time(millisecond),
                         case Apps of
                             [] -> io:format("skipped~n");
                             _ -> io:format("~pms done.~n", [T2 - T1])
