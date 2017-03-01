@@ -25,6 +25,7 @@
 -patrol([{tty, error}]).
 
 parse_transform(AST, Options) ->
+    check_transform(AST),
     io:setopts([{encoding, unicode}]),
     File = pt_lib:get_file_name(AST),
     ?PATROL_DEBUG("parse transforming: ~s", [File]),
@@ -88,9 +89,9 @@ parse_transform(AST, Options) ->
     AST4 = pt_versioned:parse_transform(AST3, Options),
 
     AST5 = pt_macro:parse_transform(AST4, Options),
-
-    %% ?PATROL_DEBUG("NEW AST START -------------~n~p~nNEW AST END ---------------~n", [AST5]),
-    AST5.
+    AST6 = add_successful_transform(AST5),
+    %% ?PATROL_DEBUG("NEW AST START -------------~n~p~nNEW AST END ---------------~n", [AST6]),
+    AST6.
 
 -spec find_implicit_tags(erl_syntax:syntaxTree(), [atom()]) -> [atom()].
 find_implicit_tags([], Acc) ->
@@ -344,6 +345,14 @@ args_count2([C | Tail], _Line) when C == $W; C == $P;
     {2, Tail};
 args_count2(Tail, Line) -> throw(?mk_parse_error(Line, {bad_log_param, Tail})).
 
+check_transform([_HeadAST1, _HeadAST2, {attribute, 0, option, successful_transform} | AST]) ->
+    throw(?mk_parse_error(0, multiple_transform));
+check_transform(AST) ->
+    ok.
+
+add_successful_transform([HeadAST1, HeadAST2 | AST]) ->
+    [HeadAST1, HeadAST2, {attribute, 0, option, successful_transform} | AST].
+
 add_get_log_tags_fun(ListOfProfiles, AST) ->
     pt_lib:add_function(AST, ast("get_log_tags() -> @ListOfProfiles.", 0)).
 
@@ -383,11 +392,13 @@ format_error({bad_log_param, Format}) ->
     EscapedFormat = lists:reverse(lists:foldl(fun ($~, Acc) -> [$~, $~|Acc];
                                                   (C, Acc)  -> [C|Acc]
                                               end, "", Format)),
-     io_lib:format("Bad log parameter: ~p~n", [EscapedFormat]);
+    io_lib:format("Bad log parameter: ~p~n", [EscapedFormat]);
 format_error({bad_log_args_num, Param}) ->
     io_lib:format("Wrong args count: ~p~n", [Param]);
 format_error(non_static_tags) ->
     "Non static log tags are forbidden";
+format_error(multiple_transform) ->
+    "Multiple parse transform";
 format_error(Unknown) ->
     io_lib:format("Unknown error: ~p~n", [Unknown]).
 
