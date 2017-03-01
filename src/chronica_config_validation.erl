@@ -25,8 +25,7 @@ validate(#chronica_config{
                     data_root = DataRoot,
                     max_file_size = MaxFileSize,
                     max_file_num = MaxFileNum,
-                    tty_enabled = TTYEnabled,
-                    backend_modules = BackendModules
+                    tty_enabled = TTYEnabled
                 }) ->
     try
         Colors = validate_colors(Colors),
@@ -41,8 +40,7 @@ validate(#chronica_config{
         validate_log_root(LogRoot),
         validate_data_root(DataRoot),
         validate_sizes(MaxFileSize, MaxFileNum),
-        validate_tty_enabled(TTYEnabled),
-        validate_backend_modules(BackendModules)
+        validate_tty_enabled(TTYEnabled)
     catch
         throw:E -> throw({bad_config, E})
     end,
@@ -89,43 +87,16 @@ validate_flows(Flows, FormatList) ->
     validate_flows2(Flows, FormatList, []).
 
 validate_flows2([], _FormatList, FlowList) -> FlowList;
-validate_flows2([#chronica_flow{flow_id = N, backends = Writers} = F | Tail], FormatList, FlowList) when erlang:is_atom(N) and erlang:is_list(Writers) ->
+validate_flows2([#chronica_flow{flow_id = N} | Tail], FormatList, FlowList) when erlang:is_atom(N) ->
     case lists:member(N, FlowList) of
         true -> throw({doubling_flows, N});
         false -> ok
-    end,
-    try
-        validate_writers(Writers, FormatList)
-    catch
-        throw:E -> throw({bad_flow, {F, E}})
     end,
     validate_flows2(Tail, FormatList, [N | FlowList]);
 validate_flows2([F | _], _FormatList, _FlowList) ->
     throw({bad_flow, F});
 validate_flows2(F, _FormatList, _FlowList) ->
     throw({bad_flow_list, F}).
-
-validate_writers([], _FormatsList) -> ok;
-validate_writers([#chronica_backend{type = T, format = F} | Tail], FormatsList) ->
-    case T of
-        tty -> ok;
-        {tty, undefined} -> ok;
-        {file, Name} when erlang:is_list(Name) and (Name=/=[]) -> ok;
-        {udp, {IP, Port}} when erlang:is_list(IP) and erlang:is_integer(Port) -> ok;
-        {tcp_con, Con} when erlang:is_pid(Con) -> ok;
-        {journald, _} -> ok;
-        {rps_alarm, _} -> ok;
-        _ -> throw({bad_writer, T})
-    end,
-    case lists:member(F, [default, binary | FormatsList]) of
-        true -> ok;
-        false -> throw({bad_format_id, F})
-    end,
-    validate_writers(Tail, FormatsList);
-validate_writers([W | _Tail], _FormatsList) ->
-    throw({bad_writer, W});
-validate_writers(W, _FormatsList) ->
-    throw({bad_writer_list, W}).
 
 validate_colors(#chronica_coloring{colored = Colored, colors_spec = ColorsSpec} = Chronica_colors) ->
     case Colored of
@@ -231,8 +202,3 @@ validate_rotate_at_startup(P) -> throw({bad_rotate_at_start_up, P}).
 validate_tty_enabled(true) -> ok;
 validate_tty_enabled(false) -> ok;
 validate_tty_enabled(P) -> throw({bad_tty_enabled, P}).
-
-validate_backend_modules([]) -> ok;
-validate_backend_modules([{Type, Module}|T]) when erlang:is_atom(Type), erlang:is_atom(Module) -> validate_backend_modules(T);
-validate_backend_modules([Inval|_]) -> throw({bad_backend, Inval});
-validate_backend_modules(Inval) -> throw({bad_backends, Inval}).

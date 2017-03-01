@@ -1216,41 +1216,33 @@ parse_flow([#chronica_backend{type = {Type, OpenParam}, format = Format} = Outpu
     case TTYEnabled of
         false when Type == tty -> parse_flow(Tail, WriterOptions, BackendModules);
         _  ->
-
-            OutputModule =
-                case proplists:get_value(Type, BackendModules, undefined) of
-                    undefined ->
-                        ?INT_ERR("Unknown backend ~p, available: ~p", [Type, BackendModules]),
-                        erlang:throw({parse_flow, {unknown_backend, Type}});
-                    M ->
-                        M
-                end,
-
-            FormatType = case Format of
+            case proplists:get_value(Type, BackendModules, undefined) of
+                undefined ->
+                    parse_flow(Tail, WriterOptions, BackendModules);
+                M ->
+                    FormatType = case Format of
                            undefined -> default;
                            _ -> Format
                          end,
-
-            case code:ensure_loaded(chronica_format) of
-                {module, _} -> ok;
-                {error, Err} -> erlang:throw({parse_flow, load_format, Err})
-            end,
-
-            case erlang:function_exported(chronica_format, FormatType, 1) of
-                true -> ok;
-                false ->
-                    ?INT_ERR("Bad format of output ~p near ~p", [Output, FormatType]),
-                    erlang:throw({parse_flow, bad_format_type})
-            end,
-
-            case chronica_gen_backend:open(OutputModule, OpenParam, WriterOptions) of
-                {ok, Handle} ->
-                    FlowHandle = #flow_handle{id = Handle, format_type = FormatType, output_module = OutputModule,
+                    case code:ensure_loaded(chronica_format) of
+                        {module, _} -> ok;
+                        {error, Err} -> erlang:throw({parse_flow, load_format, Err})
+                    end,
+                    case erlang:function_exported(chronica_format, FormatType, 1) of
+                        true -> ok;
+                        false ->
+                            ?INT_ERR("Bad format of output ~p near ~p", [Output, FormatType]),
+                            erlang:throw({parse_flow, bad_format_type})
+                    end,
+                    case chronica_gen_backend:open(M, OpenParam, WriterOptions) of
+                        {ok, Handle} ->
+                            FlowHandle = #flow_handle{id = Handle, format_type = FormatType, output_module = M,
                                               open_params = OpenParam, writer_options = WriterOptions},
-                    [FlowHandle | parse_flow(Tail, WriterOptions, BackendModules)];
-                {error, _Error} ->
-                    ?INT_ERR("Error open output: ~p Reason: ~p", [Output, _Error]),
-                    erlang:throw({parse_flow, cant_open_output})
+                            [FlowHandle | parse_flow(Tail, WriterOptions, BackendModules)];
+                        {error, _Error} ->
+                            ?INT_ERR("Error open output: ~p Reason: ~p", [Output, _Error]),
+                            erlang:throw({parse_flow, cant_open_output})
+                    end
             end
     end;
 
