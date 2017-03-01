@@ -11,7 +11,7 @@
         syntax_tools,
         pt_lib,
         pt_scripts,
-        ejournald
+        chronica_journald_backend
     ]},
     {versioned_dependencies, []},
     {mod, {chronica_app, []}},
