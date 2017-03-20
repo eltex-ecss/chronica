@@ -345,9 +345,9 @@ args_count2([C | Tail], _Line) when C == $W; C == $P;
     {2, Tail};
 args_count2(Tail, Line) -> throw(?mk_parse_error(Line, {bad_log_param, Tail})).
 
-check_transform([_HeadAST1, _HeadAST2, {attribute, 0, option, successful_transform} | AST]) ->
+check_transform([_HeadAST1, _HeadAST2, {attribute, 0, option, successful_transform} | _AST]) ->
     throw(?mk_parse_error(0, multiple_transform));
-check_transform(AST) ->
+check_transform(_AST) ->
     ok.
 
 add_successful_transform([HeadAST1, HeadAST2 | AST]) ->
