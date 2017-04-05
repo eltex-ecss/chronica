@@ -1601,11 +1601,13 @@ depended_from_chronica(chronica) ->
 depended_from_chronica(App) ->
     CheckApplicationFun =
         fun({ok, DependedApplications}) ->
-                lists:member(chronica, DependedApplications);
+                lists:member(chronica, DependedApplications) orelse
+                    lists:member(lager, DependedApplications);
            (_) ->
                 false
         end,
-    CheckApplicationFun(application:get_key(App, applications)) orelse CheckApplicationFun(application:get_key(App, included_applications)).
+    CheckApplicationFun(application:get_key(App, applications)) orelse
+        CheckApplicationFun(application:get_key(App, included_applications)).
 
 app_hash(App) ->
     Tags =
