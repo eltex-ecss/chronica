@@ -69,7 +69,7 @@ and replace on
 log:info("My stacktrace: %stack", [])
 ```
 
-##log:todo:
+## log:todo:
 Applies developers instead unused variable:
 ```erlang
     garbage() ->
@@ -192,8 +192,8 @@ If you want define custom formatter:
 {formats, [ {my_default, “%Message”} ] }
 ```
 
-##Runtime API
-###For update Chronica configuration in runtime usages:
+## Runtime API
+### For update Chronica configuration in runtime usages:
 
 * chronica_manager:active(false | true)
 
