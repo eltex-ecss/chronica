@@ -6,8 +6,8 @@ before_install:
     - chmod +x relx
 script: "./rebar -V && make travis"
 otp_release:
-    - R16B03-1
     - 17.5
     - 18.0
+    - 19.3
 notifications:
   email: false
