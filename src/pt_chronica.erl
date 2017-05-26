@@ -27,18 +27,23 @@
 parse_transform(AST, Options) ->
     check_transform(AST),
     io:setopts([{encoding, unicode}]),
-    File = pt_lib:get_file_name(AST),
-    ?PATROL_DEBUG("parse transforming: ~s", [File]),
     ?PATROL_DEBUG("options: ~p", [Options]),
-    Module = pt_lib:get_module_name(AST),
     AST0 = pt_fun_trace:parse_transform(AST, Options),
     AST1 = AST0,
-    Chronica_Tags = find_implicit_tags(AST1, []),
-    %% ?PATROL_DEBUG("AST START -------------~n~p~nAST END ---------------", [AST]),
+    {AST2, ListOfId} = replace_fake_log(AST1, replacement_mode(Options)),
+    Module = pt_lib:get_module_name(AST),
+    AST3 = add_get_log_tags_fun(lists:usort([[Module] | ListOfId]), AST2),
+    AST4 = pt_versioned:parse_transform(AST3, Options),
+    AST5 = pt_macro:parse_transform(AST4, Options),
+    add_successful_transform(AST5).
 
+replace_fake_log(AST, default_log_mode) ->
+    File = pt_lib:get_file_name(AST),
+    ?PATROL_DEBUG("parse transforming: ~s", [File]),
+    Module = pt_lib:get_module_name(AST),
     Iface = generate_module_iface_name(Module),
-
-    {AST2, ListOfId} = pt_lib:replace_fold(AST1, [
+    Chronica_Tags = find_implicit_tags(AST, []),
+    pt_lib:replace_fold(AST, [
         {
             {ast_pattern("log:todo('$String').", Line), Acc},
             begin
@@ -82,16 +87,27 @@ parse_transform(AST, Options) ->
                 fun_arity(FunName, Iface, Module, Line, File,
                  ICall, Acc, {arity_three, String, Args, Tags}, Chronica_Tags)
             end
-        }], []),
+        }], []
+    );
+replace_fake_log(AST, disable_log_mode) ->
+    {AST2, _} = pt_lib:replace_fold(AST, [
+        {
+            {ast_pattern("log:$_(...$_...).", _Line), Acc},
+            begin
+                {ast("ok.", _Line), Acc}
+            end
+        }], []
+    ),
+    {AST2, []}.
 
-    AST3 = add_get_log_tags_fun(lists:usort([[Module] | ListOfId]), AST2),
-
-    AST4 = pt_versioned:parse_transform(AST3, Options),
-
-    AST5 = pt_macro:parse_transform(AST4, Options),
-    AST6 = add_successful_transform(AST5),
-    %% ?PATROL_DEBUG("NEW AST START -------------~n~p~nNEW AST END ---------------~n", [AST6]),
-    AST6.
+replacement_mode(CompileOptions) ->
+    FlagChronicaDisabled = lists:member(chronica_disabled, CompileOptions),
+    case os:getenv("CHRONICA_DISABLED") =/= false orelse FlagChronicaDisabled of
+        true ->
+            disable_log_mode;
+        false ->
+            default_log_mode
+    end.
 
 -spec find_implicit_tags(erl_syntax:syntaxTree(), [atom()]) -> [atom()].
 find_implicit_tags([], Acc) ->
