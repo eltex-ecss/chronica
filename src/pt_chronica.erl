@@ -8,13 +8,12 @@
 %%%-------------------------------------------------------------------
 -module(pt_chronica).
 
--export(
-   [
+-export([
     parse_transform/2,
     parse_str_debug/1,
     format_error/1,
     generate_module_iface_name/1
-   ]).
+]).
 
 -include_lib("pt_lib/include/pt_lib.hrl").
 -include("chronica_int.hrl").
@@ -63,39 +62,35 @@ replace_fake_log(AST, default_log_mode) ->
         },
         {
             {ast_pattern("log:todo('$String', ...$_...).", Line), Acc},
-            begin
-                todo_out(String, contain_tags_or_args, File, Module, Line, Acc)
-            end
+            todo_out(String, contain_tags_or_args, File, Module, Line, Acc)
         },
         {
             {ast_pattern("log:$FunName('$String').", Line) = ICall, Acc},
-            begin
-                fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_one, String}, Chronica_Tags)
-            end
+            fun_arity(
+                FunName, Iface, Module, Line, File,
+                ICall, Acc, {arity_one, String}, Chronica_Tags
+            )
         },
         {
             {ast_pattern("log:$FunName('$String', '$Args').", Line) = ICall, Acc},
-            begin
-                fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_two, String, Args}, Chronica_Tags)
-            end
+            fun_arity(
+                FunName, Iface, Module, Line, File,
+                ICall, Acc, {arity_two, String, Args}, Chronica_Tags
+            )
         },
         {
             {ast_pattern("log:$FunName('$Tags', '$String', '$Args').", Line) = ICall, Acc},
-            begin
-                fun_arity(FunName, Iface, Module, Line, File,
-                 ICall, Acc, {arity_three, String, Args, Tags}, Chronica_Tags)
-            end
+            fun_arity(
+                FunName, Iface, Module, Line, File,
+                ICall, Acc, {arity_three, String, Args, Tags}, Chronica_Tags
+            )
         }], []
     );
 replace_fake_log(AST, disable_log_mode) ->
     {AST2, _} = pt_lib:replace_fold(AST, [
         {
             {ast_pattern("log:$_(...$_...).", _Line), Acc},
-            begin
-                {ast("ok.", _Line), Acc}
-            end
+            {ast("ok.", _Line), Acc}
         }], []
     ),
     {AST2, []}.
