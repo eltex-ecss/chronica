@@ -30,11 +30,100 @@ parse_transform(AST, Options) ->
     AST0 = pt_fun_trace:parse_transform(AST, Options),
     AST1 = AST0,
     {AST2, ListOfId} = replace_fake_log(AST1, replacement_mode(Options)),
+
     Module = pt_lib:get_module_name(AST),
     AST3 = add_get_log_tags_fun(lists:usort([[Module] | ListOfId]), AST2),
     AST4 = pt_versioned:parse_transform(AST3, Options),
     AST5 = pt_macro:parse_transform(AST4, Options),
     add_successful_transform(AST5).
+
+final_match_var([{_NameFunc, _ActiveVarAST, _VarLogAST, _DeactiveVarAST, ClauseAST} | _TailStateLog]) ->
+    pt_lib:first_clause(ClauseAST, "(...$_...) -> [...$_...] .").
+
+init_match_var([DataLogAST | TailClause], Acc) ->
+    {NameFunc, ClauseAST, VarLogAST} = DataLogAST,
+    FilterVar =
+        fun(AST) ->
+            VarAST = pt_lib:match(AST, ast_pattern("$Var.", _), pt_lib:is_variable(Var)),
+            lists:foldl(maps_update_count(), maps:new(), VarAST)
+        end,
+    FilterVarLogAST = FilterVar(VarLogAST),
+    case FilterVarLogAST of
+        [] ->
+            init_match_var(TailClause, Acc);
+        _ ->
+            {_, _, FuncVarAST, _, NewClauseAST} = ClauseAST,
+            ActiveVarAST = FilterVar(FuncVarAST),
+            DeactiveVarAST = FilterVar(clause_replace(NewClauseAST)),
+            DeactiveVarAST2 = maps:fold(check_active_var(), DeactiveVarAST, ActiveVarAST),
+            {DeactiveVarAST3, ActiveVarAST2} = maps:fold(
+                deactive_into_active(), {DeactiveVarAST2, ActiveVarAST}, DeactiveVarAST2
+            ),
+            case maps:fold(check_active_var(), FilterVarLogAST, ActiveVarAST2) of
+                [] ->
+                    init_match_var(TailClause, Acc);
+                FilterVarLogAST2 ->
+                    init_match_var(TailClause, [
+                        {
+                            NameFunc,
+                            maps:to_list(ActiveVarAST2),
+                            maps:to_list(FilterVarLogAST2),
+                            maps:to_list(DeactiveVarAST3),
+                            NewClauseAST
+                        } | Acc
+                    ])
+            end
+    end;
+init_match_var(_, Acc) ->
+    Acc.
+
+deactive_into_active() ->
+    fun(KeyVarAST, CountVarAST, {MapDeactive, MapActive} = Map) ->
+        case CountVarAST > 1 of
+            true ->
+                NewMapDeactive = maps:remove(KeyVarAST, MapDeactive),
+                NewMapActive = maps:put(KeyVarAST, CountVarAST, MapActive),
+                {NewMapDeactive, NewMapActive};
+            false ->
+                Map
+        end
+    end.
+
+check_active_var() ->
+    fun(KeyVarAST, _, Acc) ->
+        maps:remove(KeyVarAST, Acc)
+    end.
+
+pattern_log() ->
+    fun(ClauseAST, {Acc, NameFunc}) ->
+        case pt_lib:match(ClauseAST, ast_pattern("log:$_(...$_...).")) of
+            [] ->
+                {Acc, NameFunc};
+            LogAST ->
+                VarLogAST = [lists:last(ParamLogAST) || {_, _, _, ParamLogAST} <- LogAST],
+                {[{NameFunc, ClauseAST, VarLogAST} | Acc], NameFunc}
+        end
+    end.
+
+maps_update_count() ->
+    fun({_, _, Var}, Map) ->
+        Fun = fun(V) -> V + 1 end,
+        maps:update_with(Var, Fun, 1, Map)
+    end.
+
+clause_replace(ClauseAST) ->
+    ClauseAST2 = pt_lib:replace(ClauseAST, ast_pattern("case $_ of [...$_...] end.", Line), ast("ok.", Line)),
+    ClauseAST3 = pt_lib:replace(ClauseAST2, ast_pattern("fun [...$_...] end.", Line), ast("ok.", Line)),
+    ClauseAST4 = pt_lib:replace(ClauseAST3, ast_pattern("receive [...$_...] end.", Line), ast("ok.", Line)),
+    ClauseAST5 = pt_lib:replace(ClauseAST4, ast_pattern("receive [...$_...] after $_ -> ...$_... end.", Line), ast("ok.", Line)),
+    ClauseAST6 = pt_lib:replace(ClauseAST5, ast_pattern("try ...$_... catch [...$_...] end.", Line), ast("ok.", Line)),
+    ClauseAST7 = pt_lib:replace(ClauseAST6, ast_pattern("try ...$_... of [...$_...] catch [...$_...] end.", Line), ast("ok.", Line)),
+    ClauseAST8 = pt_lib:replace(ClauseAST7, ast_pattern("try ...$_... of [...$_...] catch [...$_...] after ...$_... end.", Line), ast("ok.", Line)),
+    ClauseAST9 = pt_lib:replace(ClauseAST8, ast_pattern("try ...$_... catch [...$_...] after ...$_... end.", Line), ast("ok.", Line)),
+    ClauseAST10 = pt_lib:replace(ClauseAST9, ast_pattern("try ...$_... after ...$_... end.", Line), ast("ok.", Line)),
+    ClauseAST11 = pt_lib:replace(ClauseAST10, ast_pattern("try ...$_... of [...$_...] after ...$_... end.", Line), ast("ok.", Line)),
+    ClauseAST12 = pt_lib:replace(ClauseAST11, ast_pattern("if [...$_...] end.", Line), ast("ok.", Line)),
+    pt_lib:replace(ClauseAST12, ast_pattern("log:$_(...$_...).", Line), ast("ok.", Line)).
 
 replace_fake_log(AST, default_log_mode) ->
     File = pt_lib:get_file_name(AST),
@@ -93,7 +182,18 @@ replace_fake_log(AST, disable_log_mode) ->
             {ast("ok.", _Line), Acc}
         }], []
     ),
-    {AST2, []}.
+    {AST2, []};
+replace_fake_log(AST, optimize_log_mode) ->
+    ListFuncAST = pt_lib:match(AST, ast_pattern("$_/$_ [...$_...].")),
+    CreatDataLogAST =
+        fun(FuncAST, Acc) ->
+            {_, _, NameFunc, _, ClausesAST} = FuncAST,
+            {DataLogAST, _} = lists:foldl(pattern_log(), {[], NameFunc}, ClausesAST),
+            DataLogAST ++ Acc
+        end,
+    DataStateLog = init_match_var(lists:foldl(CreatDataLogAST, [], ListFuncAST), []),
+    io:format("~p~n", final_match_var(DataStateLog)).
+
 
 replacement_mode(CompileOptions) ->
     FlagChronicaDisabled = lists:member(chronica_disabled, CompileOptions),
