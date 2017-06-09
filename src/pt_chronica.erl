@@ -23,6 +23,16 @@
 
 -patrol([{tty, error}]).
 
+-record(stat_var, {
+    var_log,
+    active_var,
+    deactive_var,
+    deactive_var_log,
+    name_func,
+    type_clause,
+    clause
+}).
+
 parse_transform(AST, Options) ->
     check_transform(AST),
     io:setopts([{encoding, unicode}]),
@@ -36,35 +46,99 @@ parse_transform(AST, Options) ->
     AST5 = pt_macro:parse_transform(AST4, Options),
     add_successful_transform(AST5).
 
-final_match_var([{NameFunc, ActiveVarAST, VarLogAST, DeactiveVarAST, ClauseAST} | TailStateLog], Acc) ->
-    NewClauseAST = pt_lib:first_clause(ClauseAST, ast_pattern("(...$_...) -> ...$_... .", _)),
-    NewClauseAST2 = match_var(NewClauseAST, []),
-    case NewClauseAST2 of
+final_match_var([StatVar | TailStateLog], Acc) ->
+    #stat_var{
+        deactive_var = DeactiveVar,
+        deactive_var_log = DeactiveVarLog,
+        active_var = ActiveVar,
+        clause = Clause
+    } = StatVar,
+    NewClause = pt_lib:first_clause(Clause, ast_pattern("(...$_...) -> ...$_... .", _)),
+    NewClause2 = match_var(NewClause, []),
+    case NewClause2 of
         [] ->
-            final_match_var(TailStateLog, [VarLogAST | Acc]);
+            final_match_var(TailStateLog, [DeactiveVarLog | Acc]);
         _ ->
-            io:format("NewClauseAST ~p~n", [NewClauseAST2]),
+            Data = lists:foldl(creat_data_log_ast(), [], NewClause2),
+            FindDeactiveVar =
+                fun(LocStatVar, AccDeactiveVar) ->
+                    {_, LocNewClause} = return_clause_header(
+                        LocStatVar#stat_var.type_clause, LocStatVar#stat_var.clause
+                    ),
+                    filter_var(log_replace(LocNewClause), AccDeactiveVar, repeate_var)
+                end,
+            DeactiveVar2 = lists:foldl(FindDeactiveVar, DeactiveVar, Data),
+            {_, ActiveVar2} = maps:fold(
+                deactive_into_active(), {DeactiveVar2, ActiveVar}, DeactiveVar2
+            ),
             DataStateLog = [
-                {
-                    NameFunc,
-                    filter_var(ActiveVarAST, UnfilterActiveVarAST),
-                    UnfilterVarLogAST,
-                    DeactiveVarAST,
-                    NewClauseAST,
-                    TypeClause
-                } || {
-                    _,
-                    NewClauseAST,
-                    UnfilterVarLogAST,
-                    UnfilterActiveVarAST,
-                    TypeClause
-                } <- lists:foldl(creat_data_log_ast(), [], NewClauseAST2)
+                LocStatVar#stat_var{
+                    deactive_var = DeactiveVar,
+                    deactive_var_log = DeactiveVarLog,
+                    active_var = filter_var(
+                        LocStatVar#stat_var.active_var, ActiveVar2, any_var
+                    )
+                }
+                || LocStatVar <- lists:foldl(creat_data_log_ast(), [], NewClause2)
             ],
-            io:format("DataStateLog ~p~n", [DataStateLog]),
-            final_match_var(TailStateLog, Acc)
+            ResDeactiveLog = init_match_var(DataStateLog, []),
+            final_match_var(TailStateLog, ResDeactiveLog ++ Acc)
     end;
 final_match_var(_, Acc) ->
     Acc.
+
+init_match_var([StatVar | TailClause], Acc) ->
+    #stat_var{
+        active_var = ActiveVar,
+        var_log = VarLog,
+        deactive_var_log = DeactiveVarLog,
+        deactive_var = DeactiveVar,
+        clause = Clause,
+        type_clause = TypeClause
+    } = StatVar,
+    FilterVarLog = filter_var(VarLog, maps:new(), any_var),
+    case FilterVarLog of
+        [] ->
+            init_match_var(TailClause, Acc);
+        _ ->
+            {FuncVar, NewClause} = return_clause_header(TypeClause, Clause),
+            NewActiveVar = filter_var(FuncVar, ActiveVar, any_var),
+            NewDeactiveVar = filter_var(
+                log_replace(clause_replace(NewClause)), DeactiveVar, any_var
+            ),
+            NewDeactiveVar2 = maps:fold(check_active_var(), NewDeactiveVar, NewActiveVar),
+            {NewDeactiveVar3, NewActiveVar2} = maps:fold(
+                deactive_into_active(), {NewDeactiveVar2, NewActiveVar}, NewDeactiveVar2
+            ),
+            case maps:fold(check_active_var(), FilterVarLog, NewActiveVar2) of
+                [] ->
+                    init_match_var(TailClause, Acc);
+                _ ->
+                    Log = pt_lib:match(clause_replace(NewClause), ast_pattern("log:$_(...$_...).")),
+                    UnfilterDeactiveVarLog = [lists:last(ParamLog) || {_, _, _, ParamLog} <- Log],
+                    DeactiveVarLog2 = filter_var(UnfilterDeactiveVarLog, DeactiveVarLog, any_var),
+                    DeactiveVarLog3 = maps:fold(check_active_var(), DeactiveVarLog2, NewActiveVar2),
+                    NewStatVar = StatVar#stat_var{
+                        active_var = NewActiveVar2,
+                        deactive_var_log = DeactiveVarLog3,
+                        deactive_var = NewDeactiveVar3,
+                        clause = NewClause
+                    },
+                    init_match_var(TailClause, [NewStatVar | Acc])
+            end
+    end;
+init_match_var(_, Acc) ->
+    final_match_var(Acc, []).
+
+return_clause_header(TypeClause, Clause) ->
+    case TypeClause of
+        type_func ->
+            {_, _, LocFuncVar, _, LocNewClause} = Clause,
+            {LocFuncVar, LocNewClause};
+        type_case ->
+            {_, _, LocFuncVar, _, LocNewClause} = Clause,
+            {LocFuncVar, LocNewClause}
+    end.
 
 match_var([{type_case, AST} | TailClauseAST], Acc) ->
     [ClauseAST | _] = pt_lib:match(AST, ast_pattern("case $_ of [...$_...] end.", _)),
@@ -104,49 +178,18 @@ match_var([{type_undef, _} | TailClauseAST], Acc) ->
 match_var([], Acc) ->
     Acc.
 
-init_match_var([{NameFunc, ActiveVarAST, VarLogAST, DeactiveVarAST, ClauseAST, TypeClause} | TailClause], Acc) ->
-    FilterVarLogAST = filter_var(VarLogAST, maps:new()),
-    case {FilterVarLogAST, TypeClause} of
-        [] ->
-            init_match_var(TailClause, Acc);
-        _ ->
-            {FuncVarAST, NewClauseAST} =
-                case TypeClause of
-                    type_func ->
-                        {_, _, LocFuncVarAST, _, LocNewClauseAST} = ClauseAST,
-                        {LocFuncVarAST, LocNewClauseAST}
-                end,
-            NewActiveVarAST = filter_var(FuncVarAST, ActiveVarAST),
-            NewDeactiveVarAST = filter_var(clause_replace(NewClauseAST), DeactiveVarAST),
-            NewDeactiveVarAST2 = maps:fold(check_active_var(), NewDeactiveVarAST, NewActiveVarAST),
-            {NewDeactiveVarAST3, NewActiveVarAST2} = maps:fold(
-                deactive_into_active(), {NewDeactiveVarAST2, NewActiveVarAST}, NewDeactiveVarAST2
-            ),
-            case maps:fold(check_active_var(), FilterVarLogAST, NewActiveVarAST2) of
-                [] ->
-                    init_match_var(TailClause, Acc);
-                FilterVarLogAST2 ->
-                    init_match_var(TailClause, [
-                        {
-                            NameFunc,
-                            maps:to_list(NewActiveVarAST2),
-                            maps:to_list(FilterVarLogAST2),
-                            maps:to_list(NewDeactiveVarAST3),
-                            NewClauseAST
-                        } | Acc
-                    ])
-            end
-    end;
-init_match_var(_, Acc) ->
-    final_match_var(Acc, []).
-
-filter_var(VarAST1, VarAST2) ->
+filter_var(VarAST, Maps, TypeUpdate) ->
     FilterVar =
-        fun(AST, Maps) ->
-            VarAST = pt_lib:match(AST, ast_pattern("$Var.", _), pt_lib:is_variable(Var)),
-            lists:foldl(maps_update_count(), Maps, VarAST)
+        fun(AST, LocMaps) ->
+            LocVarAST = pt_lib:match(AST, ast_pattern("$Var.", _), pt_lib:is_variable(Var)),
+            case TypeUpdate of
+                any_var ->
+                    lists:foldl(maps_update_count(), LocMaps, LocVarAST);
+                _ ->
+                    lists:foldl(maps_update_uuid_count(), LocMaps, LocVarAST)
+            end
         end,
-    FilterVar(VarAST1, VarAST2).
+    FilterVar(VarAST, Maps).
 
 deactive_into_active() ->
     fun(KeyVarAST, {Line, CountVarAST}, {MapDeactive, MapActive} = Map) ->
@@ -169,25 +212,39 @@ creat_data_log_ast() ->
     fun
         ({type_func, AST}, Acc) ->
             {_, _, NameFunc, _, ClausesAST} = AST,
-            {DataLogAST, _, _, _} = lists:foldl(pattern_log(), {[], NameFunc, maps:new(), type_func}, ClausesAST),
+            DataLogAST = [
+                init_stat_var(NameFunc, ClauseAST, VarLogAST, maps:new(), type_func) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
+            ],
             DataLogAST ++ Acc;
         ({type_case, AST}, Acc) ->
-            {_, _, VarAST, _, ClausesAST} = AST,
-            {DataLogAST, _, _, _} = lists:foldl(pattern_log(), {[], undef, VarAST, type_case}, ClausesAST),
+            {_, _, VarAST, ClausesAST} = AST,
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, VarAST, type_case) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
+            ],
             DataLogAST ++ Acc;
-        (DATA, Acc) ->
-            io:format("DATA ~p~n", [DATA]),
+        (_, Acc) ->
             Acc
     end.
 
+init_stat_var(NameFunc, ClauseAST, VarLogAST, ActiveVarAST, TypeClause) ->
+    #stat_var{
+        name_func = NameFunc,
+        clause = ClauseAST,
+        var_log = VarLogAST,
+        active_var = ActiveVarAST,
+        type_clause = TypeClause
+    }.
+
 pattern_log() ->
-    fun(ClauseAST, {Acc, NameFunc, Maps, TypeClause}) ->
+    fun(ClauseAST, Acc) ->
         case pt_lib:match(ClauseAST, ast_pattern("log:$_(...$_...).")) of
             [] ->
-                {Acc, NameFunc, Maps, TypeClause};
+                Acc;
             LogAST ->
                 VarLogAST = [lists:last(ParamLogAST) || {_, _, _, ParamLogAST} <- LogAST],
-                {[{NameFunc, ClauseAST, VarLogAST, Maps, TypeClause} | Acc], NameFunc, Maps, TypeClause}
+                [{ClauseAST, VarLogAST} | Acc]
         end
     end.
 
@@ -195,6 +252,17 @@ maps_update_count() ->
     fun({_, Line, Var}, Map) ->
         Fun = fun({L, V}) -> {L, V + 1} end,
         maps:update_with(Var, Fun, {Line, 1}, Map)
+    end.
+
+maps_update_uuid_count() ->
+    fun({_, _, Var}, Map) ->
+        Fun = fun({L, V}) -> {L, V + 1} end,
+        case maps:is_key(Var, Map) of
+            true ->
+                maps:update_with(Var, Fun, Map);
+            false ->
+                Map
+        end
     end.
 
 clause_replace(ClauseAST) ->
@@ -208,8 +276,10 @@ clause_replace(ClauseAST) ->
     ClauseAST9 = pt_lib:replace(ClauseAST8, ast_pattern("try ...$_... catch [...$_...] after ...$_... end.", Line), ast("ok.", Line)),
     ClauseAST10 = pt_lib:replace(ClauseAST9, ast_pattern("try ...$_... after ...$_... end.", Line), ast("ok.", Line)),
     ClauseAST11 = pt_lib:replace(ClauseAST10, ast_pattern("try ...$_... of [...$_...] after ...$_... end.", Line), ast("ok.", Line)),
-    ClauseAST12 = pt_lib:replace(ClauseAST11, ast_pattern("if [...$_...] end.", Line), ast("ok.", Line)),
-    pt_lib:replace(ClauseAST12, ast_pattern("log:$_(...$_...).", Line), ast("ok.", Line)).
+    pt_lib:replace(ClauseAST11, ast_pattern("if [...$_...] end.", Line), ast("ok.", Line)).
+
+log_replace(LogAST) ->
+    pt_lib:replace(LogAST, ast_pattern("log:$_(...$_...).", Line), ast("ok.", Line)).
 
 replace_fake_log(AST, default_log_mode) ->
     File = pt_lib:get_file_name(AST),
@@ -269,22 +339,38 @@ replace_fake_log(AST, disable_log_mode) ->
         }], []
     ),
     {AST2, []};
-replace_fake_log(AST, optimize_log_mode) ->
-    ListFuncAST = [{type_func, LocAST} || LocAST <- pt_lib:match(AST, ast_pattern("$_/$_ [...$_...]."))],
-    DataStateLog = [
-        {NameFunc, ActiveVarAST, VarLogAST, maps:new(), ClauseAST, TypeClause} ||
-            {
-                NameFunc,
-                ClauseAST,
-                VarLogAST,
-                ActiveVarAST,
-                TypeClause
-            } <- lists:foldl(creat_data_log_ast(), [], ListFuncAST)
+replace_fake_log(AST, optimization_log_mode) ->
+    ListFuncAST = [
+        {type_func, LocAST} || LocAST <- pt_lib:match(AST, ast_pattern("$_/$_ [...$_...]."))
     ],
-    ResDeactiveLog = init_match_var(DataStateLog, []),
-    io:format("ResDeactiveLog ~p~n", [ResDeactiveLog]),
-    AST.
+    DataStateLog = [
+        StatVar#stat_var{deactive_var = maps:new(), deactive_var_log = maps:new()} ||
+            StatVar <- lists:foldl(creat_data_log_ast(), [], ListFuncAST)
+    ],
+    MatchVar =
+        fun(StatVar, Acc) ->
+            ListDeactiveLog = init_match_var([StatVar], []),
+            Flatten =
+                fun(DeactiveLog, LocAcc) ->
+                    maps:to_list(DeactiveLog) ++ LocAcc
+                end,
+            lists:foldl(Flatten, [], ListDeactiveLog) ++ Acc
+        end,
+    ListWarning = lists:foldl(MatchVar, [], DataStateLog),
+    File = pt_lib:get_file_name(AST),
+    {ok, Cwd} = file:get_cwd(),
+    FullFile = filename:join(Cwd, File),
+    format_warning(ListWarning, FullFile),
+    replace_fake_log(AST, default_log_mode).
 
+format_warning([{Var, {Line, _}} | TailListWarning], FullFile) ->
+    io:format(
+        "~ts:~p: Warning: variable ~p is unused anywhere except logs of chronica. ~n",
+        [FullFile, Line, Var]
+    ),
+    format_warning(TailListWarning, FullFile);
+format_warning(_, _) ->
+    ok.
 
 replacement_mode(CompileOptions) ->
     FlagChronicaDisabled = lists:member(chronica_disabled, CompileOptions),
@@ -292,7 +378,13 @@ replacement_mode(CompileOptions) ->
         true ->
             disable_log_mode;
         false ->
-            default_log_mode
+            FlagChronicaOptimization = lists:member(chronica_optimization, CompileOptions),
+            case os:getenv("CHRONICA_OPTIMIZATION") =/= false orelse FlagChronicaOptimization of
+                true ->
+                    optimization_log_mode;
+                false ->
+                    default_log_mode
+            end
     end.
 
 -spec find_implicit_tags(erl_syntax:syntaxTree(), [atom()]) -> [atom()].
