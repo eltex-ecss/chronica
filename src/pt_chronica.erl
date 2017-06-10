@@ -24,6 +24,10 @@
 
 -patrol([{tty, error}]).
 
+%%%===================================================================
+%%% API
+%%%===================================================================
+%parse_transform
 parse_transform(AST, Options) ->
     check_transform(AST),
     io:setopts([{encoding, unicode}]),
@@ -37,6 +41,98 @@ parse_transform(AST, Options) ->
     AST5 = pt_macro:parse_transform(AST4, Options),
     add_successful_transform(AST5).
 
+%parse_str_debug
+parse_str_debug(Str) ->
+    ToAST =
+        fun (Str1) ->
+            Line = 0,
+            case erl_scan:string(Str1, Line) of
+                {ok, Tokens, _} ->
+                    case erl_parse:parse_form(Tokens) of
+                        {ok, Abs} -> {ok, [Abs]};
+                        {error, ParseFormError} ->
+                            case erl_parse:parse_exprs(Tokens) of
+                                {ok, List} -> {ok, List};
+                                {error, ParseExprsError} ->
+                                    ?PATROL_ERROR(
+                                        "Error when parsing string  "
+                                        "\"~s\"~nparse_form: ~s~n"
+                                        "parse_exprs: ~s",
+                                        [
+                                            Str1,
+                                            pt_supp:format_errors(ParseFormError),
+                                            pt_supp:format_errors(ParseExprsError)
+                                        ]
+                                    ),
+                                    {error, ParseExprsError}
+                            end
+                    end;
+                {error, ScanErrorInfo, _ScanEndLocation} ->
+                    ?PATROL_ERROR(
+                        "Error when parsing string \"~s\":~n ~s",
+                        [Str1, pt_supp:format_errors(ScanErrorInfo)]
+                    ),
+                    {error, ScanErrorInfo}
+            end
+        end,
+    {ok, A} = ToAST(Str),
+    AST = parse_transform(
+        [
+            {attribute, 0, file, {"test.erl", 0}},
+            {attribute, 0, module, mod} | A
+        ], []
+    ),
+    ResAST =
+        case lists:keytake(module, 3, AST) of
+            {value, _, R} -> R;
+            false -> false
+        end,
+    ResStr = pt_lib:ast2str(ResAST),
+    io:format("\""++ResStr++"\"", []).
+
+%format_error
+format_error({list_forget_var, Args}) ->
+    io_lib:format("Args parameter should be list: ~p, (use _ to skip error)", [Args]);
+format_error({invalid_args, Str, Args}) ->
+    NewStr = lists:reverse(lists:foldl(
+        fun
+            ($~, Acc) -> [$~, $~|Acc];
+            (C, Acc)  -> [C|Acc]
+        end, "", Str
+    )),
+    Format = "Invalid args. Format must be string. Args must be list of terms. Format: ~s, Args: ~s",
+    io_lib:format(Format, [NewStr, Args]);
+format_error({invalid_args_length, InvalidLength}) ->
+    io_lib:format("Impossible error. pt_lib:list_length return ~p.", [InvalidLength]);
+format_error({list_forget, Args}) ->
+    io_lib:format("Args parameter should be list: ~p", [Args]);
+format_error({bad_log_param, Format}) ->
+    EscapedFormat = lists:reverse(lists:foldl(
+        fun
+            ($~, Acc) -> [$~, $~|Acc];
+            (C, Acc)  -> [C|Acc]
+        end, "", Format
+    )),
+    io_lib:format("Bad log parameter: ~p~n", [EscapedFormat]);
+format_error({bad_log_args_num, Param}) ->
+    io_lib:format("Wrong args count: ~p~n", [Param]);
+format_error(non_static_tags) ->
+    "Non static log tags are forbidden";
+format_error(multiple_transform) ->
+    "Multiple parse transform";
+format_error(Unknown) ->
+    io_lib:format("Unknown error: ~p~n", [Unknown]).
+
+%generate_module_iface_name
+generate_module_iface_name(Module) ->
+    case string:tokens(erlang:atom_to_list(Module), ".") of
+        [_] -> generate_module_iface_name_(Module);
+        Tokens -> generate_module_iface_name_([erlang:list_to_atom(T) || T <- Tokens])
+    end.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 check_transform([_HeadAST1, _HeadAST2, {attribute, 0, option, successful_transform} | _AST]) ->
     throw(?mk_parse_error(0, multiple_transform));
 check_transform(_AST) ->
@@ -164,63 +260,15 @@ find_implicit_tags([{attribute, _, chronica_tag, Param} | Tail], Acc) when is_li
 find_implicit_tags([_ | Tail], Acc) ->
     find_implicit_tags(Tail, Acc).
 
-parse_str_debug(Str) ->
-    ToAST = fun (Str1) ->
-        Line = 0,
-        case erl_scan:string(Str1, Line) of
-            {ok, Tokens, _} ->
-                case erl_parse:parse_form(Tokens) of
-                    {ok, Abs} -> {ok, [Abs]};
-                    {error, ParseFormError} ->
-                        case erl_parse:parse_exprs(Tokens) of
-                            {ok, List} -> {ok, List};
-                            {error, ParseExprsError} ->
-                                ?PATROL_ERROR("Error when parsing string  "
-                                              "\"~s\"~nparse_form: ~s~n"
-                                              "parse_exprs: ~s",
-                                [Str1,
-                                 pt_supp:format_errors(ParseFormError),
-                                 pt_supp:format_errors(ParseExprsError)]),
-                                {error, ParseExprsError}
-                        end
-                end;
-            {error, ScanErrorInfo, _ScanEndLocation} ->
-                ?PATROL_ERROR("Error when parsing string \"~s\":~n ~s",
-                              [Str1, pt_supp:format_errors(ScanErrorInfo)]),
-                {error, ScanErrorInfo}
-        end
-    end,
-    {ok, A} = ToAST(Str),
-    AST = parse_transform(
-        [
-            {attribute, 0, file, {"test.erl", 0}},
-            {attribute, 0, module, mod} | A
-        ], []
-    ),
-    ResAST =
-        case lists:keytake(module, 3, AST) of
-            {value, _, R} -> R;
-            false -> false
-        end,
-    ResStr = pt_lib:ast2str(ResAST),
-    io:format("\""++ResStr++"\"", []).
-
 add_successful_transform([HeadAST1, HeadAST2 | AST]) ->
     [HeadAST1, HeadAST2, {attribute, 0, option, successful_transform} | AST].
 
 add_get_log_tags_fun(ListOfProfiles, AST) ->
     pt_lib:add_function(AST, ast("get_log_tags() -> @ListOfProfiles.", 0)).
 
-generate_module_iface_name(Module) ->
-    case string:tokens(erlang:atom_to_list(Module), ".") of
-        [_] -> generate_module_iface_name_(Module);
-        Tokens -> generate_module_iface_name_([erlang:list_to_atom(T) || T <- Tokens])
-    end.
-
 generate_module_iface_name_(ModuleName) when is_list(ModuleName) -> % list of atoms, not string
     [Last | Other] = lists:reverse(ModuleName),
     concat_module(lists:reverse([generate_module_iface_name_(Last)|Other]));
-
 generate_module_iface_name_(ModuleName) when is_atom(ModuleName) ->
     erlang:list_to_atom("chronica_iface_" ++ erlang:atom_to_list(ModuleName)).
 
@@ -230,34 +278,3 @@ concat_module([First | Atoms]) when is_list(Atoms) ->
             Acc ++ "." ++ erlang:atom_to_list(A)
         end, erlang:atom_to_list(First), Atoms),
     erlang:list_to_atom(Name).
-
-format_error({list_forget_var, Args}) ->
-    io_lib:format("Args parameter should be list: ~p, (use _ to skip error)", [Args]);
-format_error({invalid_args, Str, Args}) ->
-    NewStr = lists:reverse(lists:foldl(
-        fun
-            ($~, Acc) -> [$~, $~|Acc];
-            (C, Acc)  -> [C|Acc]
-        end, "", Str
-    )),
-    io_lib:format("Invalid args. Format must be string. Args must be list of terms. Format: ~s, Args: ~s", [NewStr, Args]);
-format_error({invalid_args_length, InvalidLength}) ->
-    io_lib:format("Impossible error. pt_lib:list_length return ~p.", [InvalidLength]);
-format_error({list_forget, Args}) ->
-    io_lib:format("Args parameter should be list: ~p", [Args]);
-format_error({bad_log_param, Format}) ->
-    EscapedFormat = lists:reverse(lists:foldl(
-        fun
-            ($~, Acc) -> [$~, $~|Acc];
-            (C, Acc)  -> [C|Acc]
-        end, "", Format
-    )),
-    io_lib:format("Bad log parameter: ~p~n", [EscapedFormat]);
-format_error({bad_log_args_num, Param}) ->
-    io_lib:format("Wrong args count: ~p~n", [Param]);
-format_error(non_static_tags) ->
-    "Non static log tags are forbidden";
-format_error(multiple_transform) ->
-    "Multiple parse transform";
-format_error(Unknown) ->
-    io_lib:format("Unknown error: ~p~n", [Unknown]).

@@ -25,6 +25,10 @@
 parse_transform(AST, _) ->
     AST.
 
+%%%===================================================================
+%%% Internal API
+%%%===================================================================
+%init_match_var
 init_match_var([StatVar | TailClause], Acc) ->
     #stat_var{
         active_var = ActiveVar,
@@ -68,6 +72,40 @@ init_match_var([StatVar | TailClause], Acc) ->
 init_match_var(_, Acc) ->
     final_match_var(Acc, []).
 
+%creat_data_log_ast
+creat_data_log_ast() ->
+    fun
+        ({type_func, AST}, Acc) ->
+            {_, _, NameFunc, _, ClausesAST} = AST,
+            DataLogAST = [
+                init_stat_var(NameFunc, ClauseAST, VarLogAST, maps:new(), type_func) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
+            ],
+            DataLogAST ++ Acc;
+        ({type_case, AST}, Acc) ->
+            {_, _, VarAST, ClausesAST} = AST,
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, VarAST, type_case) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
+            ],
+            DataLogAST ++ Acc;
+        (_, Acc) ->
+            Acc
+    end.
+
+%format_warning
+format_warning([{Var, {Line, _}} | TailListWarning], FullFile) ->
+    io:format(
+        "~ts:~p: Warning: variable ~p is unused anywhere except logs of chronica. ~n",
+        [FullFile, Line, Var]
+    ),
+    format_warning(TailListWarning, FullFile);
+format_warning(_, _) ->
+    ok.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 final_match_var([StatVar | TailStateLog], Acc) ->
     #stat_var{
         deactive_var = DeactiveVar,
@@ -187,26 +225,6 @@ check_active_var() ->
         maps:remove(KeyVarAST, Acc)
     end.
 
-creat_data_log_ast() ->
-    fun
-        ({type_func, AST}, Acc) ->
-            {_, _, NameFunc, _, ClausesAST} = AST,
-            DataLogAST = [
-                init_stat_var(NameFunc, ClauseAST, VarLogAST, maps:new(), type_func) ||
-                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
-            ],
-            DataLogAST ++ Acc;
-        ({type_case, AST}, Acc) ->
-            {_, _, VarAST, ClausesAST} = AST,
-            DataLogAST = [
-                init_stat_var(undef, ClauseAST, VarLogAST, VarAST, type_case) ||
-                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
-            ],
-            DataLogAST ++ Acc;
-        (_, Acc) ->
-            Acc
-    end.
-
 init_stat_var(NameFunc, ClauseAST, VarLogAST, ActiveVarAST, TypeClause) ->
     #stat_var{
         name_func = NameFunc,
@@ -245,26 +263,53 @@ maps_update_uuid_count() ->
     end.
 
 clause_replace(ClauseAST) ->
-    ClauseAST2 = pt_lib:replace(ClauseAST, ast_pattern("case $_ of [...$_...] end.", Line), ast("ok.", Line)),
-    ClauseAST3 = pt_lib:replace(ClauseAST2, ast_pattern("fun [...$_...] end.", Line), ast("ok.", Line)),
-    ClauseAST4 = pt_lib:replace(ClauseAST3, ast_pattern("receive [...$_...] end.", Line), ast("ok.", Line)),
-    ClauseAST5 = pt_lib:replace(ClauseAST4, ast_pattern("receive [...$_...] after $_ -> ...$_... end.", Line), ast("ok.", Line)),
-    ClauseAST6 = pt_lib:replace(ClauseAST5, ast_pattern("try ...$_... catch [...$_...] end.", Line), ast("ok.", Line)),
-    ClauseAST7 = pt_lib:replace(ClauseAST6, ast_pattern("try ...$_... of [...$_...] catch [...$_...] end.", Line), ast("ok.", Line)),
-    ClauseAST8 = pt_lib:replace(ClauseAST7, ast_pattern("try ...$_... of [...$_...] catch [...$_...] after ...$_... end.", Line), ast("ok.", Line)),
-    ClauseAST9 = pt_lib:replace(ClauseAST8, ast_pattern("try ...$_... catch [...$_...] after ...$_... end.", Line), ast("ok.", Line)),
-    ClauseAST10 = pt_lib:replace(ClauseAST9, ast_pattern("try ...$_... after ...$_... end.", Line), ast("ok.", Line)),
-    ClauseAST11 = pt_lib:replace(ClauseAST10, ast_pattern("try ...$_... of [...$_...] after ...$_... end.", Line), ast("ok.", Line)),
-    pt_lib:replace(ClauseAST11, ast_pattern("if [...$_...] end.", Line), ast("ok.", Line)).
+    ClauseAST2 = pt_lib:replace(
+        ClauseAST, ast_pattern("case $_ of [...$_...] end.", Line), ast("ok.", Line)
+    ),
+    ClauseAST3 = pt_lib:replace(
+        ClauseAST2, ast_pattern("fun [...$_...] end.", Line), ast("ok.", Line)
+    ),
+    ClauseAST4 = pt_lib:replace(
+        ClauseAST3, ast_pattern("receive [...$_...] end.", Line), ast("ok.", Line)
+    ),
+    ClauseAST5 = pt_lib:replace(
+        ClauseAST4,
+        ast_pattern("receive [...$_...] after $_ -> ...$_... end.", Line),
+        ast("ok.", Line)
+    ),
+    ClauseAST6 = pt_lib:replace(
+        ClauseAST5,
+        ast_pattern("try ...$_... catch [...$_...] end.", Line),
+        ast("ok.", Line)
+    ),
+    ClauseAST7 = pt_lib:replace(
+        ClauseAST6,
+        ast_pattern("try ...$_... of [...$_...] catch [...$_...] end.", Line),
+        ast("ok.", Line)
+    ),
+    ClauseAST8 = pt_lib:replace(
+        ClauseAST7,
+        ast_pattern("try ...$_... of [...$_...] catch [...$_...] after ...$_... end.", Line),
+        ast("ok.", Line)
+    ),
+    ClauseAST9 = pt_lib:replace(
+        ClauseAST8,
+        ast_pattern("try ...$_... catch [...$_...] after ...$_... end.", Line),
+        ast("ok.", Line)
+    ),
+    ClauseAST10 = pt_lib:replace(
+        ClauseAST9,
+        ast_pattern("try ...$_... after ...$_... end.", Line),
+        ast("ok.", Line)
+    ),
+    ClauseAST11 = pt_lib:replace(
+        ClauseAST10,
+        ast_pattern("try ...$_... of [...$_...] after ...$_... end.", Line),
+        ast("ok.", Line)
+    ),
+    pt_lib:replace(
+        ClauseAST11, ast_pattern("if [...$_...] end.", Line), ast("ok.", Line)
+    ).
 
 log_replace(LogAST) ->
     pt_lib:replace(LogAST, ast_pattern("log:$_(...$_...).", Line), ast("ok.", Line)).
-
-format_warning([{Var, {Line, _}} | TailListWarning], FullFile) ->
-    io:format(
-        "~ts:~p: Warning: variable ~p is unused anywhere except logs of chronica. ~n",
-        [FullFile, Line, Var]
-    ),
-    format_warning(TailListWarning, FullFile);
-format_warning(_, _) ->
-    ok.

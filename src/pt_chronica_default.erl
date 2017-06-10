@@ -24,10 +24,57 @@
 parse_transform(AST, _) ->
     AST.
 
+%%%===================================================================
+%%% Internal API
+%%%===================================================================
+%todo_out
+todo_out({_, _, Format}, [], File, Module, Line, Acc) ->
+    {ok, Cwd} = file:get_cwd(),
+    FullFile = filename:join(Cwd, File),
+    io:format("~ts:~p: TODO: " ++ Format ++ "~n", [FullFile, Line]),
+    LogId = log_id(Module, Line),
+    Tags = [Module, LogId],
+    {ast("ok.", Line), [Tags|Acc]};
+todo_out(_, View_warrning, File, Module, Line, Acc) ->
+    {ok, Cwd} = file:get_cwd(),
+    FullFile = filename:join(Cwd, File),
+    view_out_warrning(FullFile, Line, View_warrning),
+    LogId = log_id(Module, Line),
+    Tags = [Module, LogId],
+    {ast("ok.", Line), [Tags|Acc]}.
+
+%fun_arity
+fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity, Chronica_Tags) ->
+    case mapFunToPriority(Level) of
+        {ok, Priority} ->
+            LogId = log_id(Module, Line),
+            Tags = [Module, LogId] ++ Chronica_Tags,
+            case Arity of
+                {arity_one, String} ->
+                    fun_arity_one(Priority, Iface, Tags, Module, Line, File, Acc, String);
+                {arity_two, String, Args} ->
+                    fun_arity_two(Priority, Iface, Tags, Module, Line, File, Acc, String, Args);
+                {arity_three, String, Args, ASTTags} ->
+                    NewTags = asttags2list(ASTTags, Line),
+                    fun_arity_three(
+                        Priority, Iface, Tags ++ NewTags, Module, Line, File, Acc, String, Args
+                    )
+            end;
+        {error, _} ->
+            {ICall, Acc}
+    end.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 detective_stacktrace({var, _, _}, _, _) -> [];
 detective_stacktrace({nil, _}, Positions, _) ->
     lists:reverse(Positions);
-detective_stacktrace({cons, _, {call, _, {remote, _, {atom, _, erlang}, {atom, _, get_stacktrace}}, _}, Tail}, Positions, CurrentPosition) ->
+detective_stacktrace(
+        {cons, _, {call, _, {remote, _, {atom, _, erlang}, {atom, _, get_stacktrace}}, _}, Tail},
+        Positions,
+        CurrentPosition
+    ) ->
     detective_stacktrace(Tail, [CurrentPosition | Positions], CurrentPosition + 1);
 detective_stacktrace({_, _, _, Tail}, Positions, CurrentPosition) ->
     detective_stacktrace(Tail, Positions, CurrentPosition + 1).
@@ -35,8 +82,11 @@ detective_stacktrace({_, _, _, Tail}, Positions, CurrentPosition) ->
 set_stacktrace_args(ArgsParam, [], _Line) ->
     {ArgsParam, ""};
 set_stacktrace_args(ArgsParam, Positions, Line) ->
-    Chronica_stacktrace_line = erlang:list_to_atom("Chronica_stacktrace" ++ erlang:integer_to_list(Line)),
-    {set_activate(ArgsParam, 0, Positions, Chronica_stacktrace_line), {var, Line, Chronica_stacktrace_line}}.
+    Chronica_stacktrace_line = erlang:list_to_atom(
+        "Chronica_stacktrace" ++ erlang:integer_to_list(Line)
+    ),
+    SetActivate = set_activate(ArgsParam, 0, Positions, Chronica_stacktrace_line),
+    {SetActivate, {var, Line, Chronica_stacktrace_line}}.
 
 set_activate(ArgsParam, _CurrentPosition, [], _) ->
     ArgsParam;
@@ -84,27 +134,17 @@ args_count([$~ | Tail], N, Line) ->
 args_count([_ | Tail], N, Line) ->
     args_count(Tail, N, Line).
 
-args_count2([C | Tail], Line) when C == $.; C == $-;
-                             C == $0; C == $1;
-                             C == $2; C == $3;
-                             C == $4; C == $5;
-                             C == $6; C == $7;
-                             C == $8; C == $9 ->
+args_count2([C | Tail], Line) when C == $.; C == $-; C == $0; C == $1; C == $2; C == $3;
+                                   C == $4; C == $5; C == $6; C == $7; C == $8; C == $9 ->
     args_count2(Tail, Line);
 args_count2([C | Tail], _Line) when C == $~; C == $n ->
     {0, Tail};
-args_count2([C | Tail], _Line) when C == $c; C == $f;
-                             C == $e; C == $g;
-                             C == $s; C == $w;
-                             C == $p; C == $B;
-                             C == $#; C == $b;
-                             C == $+; C == $i;
-                             C == $t ->
+args_count2([C | Tail], _Line) when C == $c; C == $f; C == $e; C == $g; C == $s; C == $w;
+                                    C == $p; C == $B; C == $#; C == $b; C == $+; C == $i;
+                                    C == $t ->
     {1, Tail};
-args_count2([C | Tail], _Line) when C == $W; C == $P;
-                             C == $X; C == $x;
-                             C == $s; C == $w;
-                             C == $p ->
+args_count2([C | Tail], _Line) when C == $W; C == $P; C == $X; C == $x; C == $s; C == $w;
+                                    C == $p ->
     {2, Tail};
 args_count2(Tail, Line) -> throw(?mk_parse_error(Line, {bad_log_param, Tail})).
 
@@ -114,7 +154,6 @@ log_id(Module, Line) ->
 asttags2list(Tags, Line) ->
     case pt_lib:is_term(Tags) of
         true ->
-            _NewTags =
             try
                 case erl_syntax:concrete(Tags) of
                     L when is_list(L) -> lists:usort(L);
@@ -142,28 +181,23 @@ mapFunToPriority({atom, _, warning}) -> {ok, ?P_WARNING};
 mapFunToPriority({atom, _, error}) -> {ok, ?P_ERROR};
 mapFunToPriority(_) -> {error, not_found}.
 
-fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity, Chronica_Tags) ->
-    case mapFunToPriority(Level) of
-        {ok, Priority} ->
-            LogId = log_id(Module, Line),
-            Tags = [Module, LogId] ++ Chronica_Tags,
-            case Arity of
-                {arity_one, String} ->
-                    fun_arity_one(Priority, Iface, Tags, Module, Line, File, Acc, String);
-                {arity_two, String, Args} ->
-                    fun_arity_two(Priority, Iface, Tags, Module, Line, File, Acc, String, Args);
-                {arity_three, String, Args, ASTTags} ->
-                    NewTags = asttags2list(ASTTags, Line),
-                    fun_arity_three(Priority, Iface, Tags ++ NewTags, Module, Line, File, Acc, String, Args)
-            end;
-        {error, _} ->
-            {ICall, Acc}
-    end.
-
 fun_arity_one(Priority, Iface, Tags, Module, Line, File, Acc, String) ->
     check_log_params(String, ast("[].", 1), Line),
     NewStringParam = wrapParam(String),
-    {ast("chronica_core:log_fast(@Iface, @Priority, @Tags, '@Module', '@Line', '@File', pt_macro_define(function_string), $NewStringParam, []).", Line), [Tags|Acc]}.
+    AST = ast(
+        "chronica_core:log_fast(
+            @Iface,
+            @Priority,
+            @Tags,
+            '@Module',
+            '@Line',
+            '@File',
+            pt_macro_define(function_string),
+            $NewStringParam,
+            []
+        ).", Line
+    ),
+    {AST, [Tags|Acc]}.
 
 fun_arity_two(Priority, Iface, Tags, Module, Line, File, Acc, String, Args) ->
     check_log_params(String, Args, Line),
@@ -173,9 +207,38 @@ fun_arity_two(Priority, Iface, Tags, Module, Line, File, Acc, String, Args) ->
     NewArgsParam = wrapParam(Args2),
     case Positions of
         [] ->
-            {ast("chronica_core:log_fast(@Iface, @Priority, @Tags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam).", Line), [Tags|Acc]};
+            AST = ast(
+                "chronica_core:log_fast(
+                    @Iface,
+                    @Priority,
+                    @Tags,
+                    @Module,
+                    @Line,
+                    @File,
+                    pt_macro_define(function_string),
+                    $NewStringParam,
+                    $NewArgsParam
+                ).", Line
+            ),
+            {AST, [Tags|Acc]};
         _ ->
-            {ast("begin $Chronica_stacktrace_line = erlang:get_stacktrace(), chronica_core:log_fast(@Iface, @Priority, @Tags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam) end.", Line), [Tags|Acc]}
+            AST = ast(
+                "begin
+                    $Chronica_stacktrace_line = erlang:get_stacktrace(),
+                    chronica_core:log_fast(
+                        @Iface,
+                        @Priority,
+                        @Tags,
+                        @Module,
+                        @Line,
+                        @File,
+                        pt_macro_define(function_string),
+                        $NewStringParam,
+                        $NewArgsParam
+                    )
+                end.", Line
+            ),
+            {AST, [Tags|Acc]}
     end.
 
 fun_arity_three(Priority, Iface, NewTags, Module, Line, File, Acc, String, Args) ->
@@ -186,30 +249,46 @@ fun_arity_three(Priority, Iface, NewTags, Module, Line, File, Acc, String, Args)
     NewArgsParam = wrapParam(Args2),
     case Positions of
         [] ->
-            {ast("chronica_core:log_fast(@Iface,@Priority, @NewTags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam).", Line), [NewTags|Acc]};
+            AST = ast(
+                "chronica_core:log_fast(
+                    @Iface,
+                    @Priority,
+                    @NewTags,
+                    @Module,
+                    @Line,
+                    @File,
+                    pt_macro_define(function_string),
+                    $NewStringParam,
+                    $NewArgsParam
+                ).", Line
+            ),
+            {AST, [NewTags|Acc]};
         _ ->
-            {ast("begin $Chronica_stacktrace_line = erlang:get_stacktrace(), chronica_core:log_fast(@Iface, @Priority, @NewTags, @Module, @Line, @File, pt_macro_define(function_string), $NewStringParam, $NewArgsParam) end.", Line), [NewTags|Acc]}
+            AST = ast("
+                begin
+                    $Chronica_stacktrace_line = erlang:get_stacktrace(),
+                    chronica_core:log_fast(
+                        @Iface,
+                        @Priority,
+                        @NewTags,
+                        @Module,
+                        @Line,
+                        @File,
+                        pt_macro_define(function_string),
+                        $NewStringParam,
+                        $NewArgsParam
+                    )
+                end.", Line
+            ),
+            {AST, [NewTags|Acc]}
     end.
 
-todo_out({_, _, Format}, [], File, Module, Line, Acc) ->
-    {ok, Cwd} = file:get_cwd(),
-    FullFile = filename:join(Cwd, File),
-    io:format("~ts:~p: TODO: " ++ Format ++ "~n", [FullFile, Line]),
-    LogId = log_id(Module, Line),
-    Tags = [Module, LogId],
-    {ast("ok.", Line), [Tags|Acc]};
-
-todo_out(_, View_warrning, File, Module, Line, Acc) ->
-    {ok, Cwd} = file:get_cwd(),
-    FullFile = filename:join(Cwd, File),
-    view_out_warrning(FullFile, Line, View_warrning),
-    LogId = log_id(Module, Line),
-    Tags = [Module, LogId],
-    {ast("ok.", Line), [Tags|Acc]}.
-
 view_out_warrning(FullFile, Line, contain_tags_or_args) ->
-        io:format("~ts:~p: Warning: call log:todo() shouldn't contain tags and arguments. ~n", [FullFile, Line]);
+    Format = "~ts:~p: Warning: call log:todo() shouldn't contain tags and arguments. ~n",
+    io:format(Format, [FullFile, Line]);
 view_out_warrning(FullFile, Line, dont_const) ->
-        io:format("~ts:~p: Warning: Format in call log:todo() shouldn't be constant. ~n", [FullFile, Line]);
+    Format = "~ts:~p: Warning: Format in call log:todo() shouldn't be constant. ~n",
+    io:format(Format, [FullFile, Line]);
 view_out_warrning(FullFile, Line, control_symbol) ->
-        io:format("~ts:~p: Warning: Format in call log:todo() shouldn't contain control symbols. ~n", [FullFile, Line]).
+    Format = "~ts:~p: Warning: Format in call log:todo() shouldn't contain control symbols. ~n",
+    io:format(Format, [FullFile, Line]).
