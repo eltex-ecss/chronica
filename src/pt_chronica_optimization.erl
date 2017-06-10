@@ -239,11 +239,11 @@ find_deactive_var() ->
 return_clause_header(TypeClause, Clause) ->
     case TypeClause of
         type_if ->
-            {_, _, _, LocFuncVar, LocNewClause} = Clause,
-            {LocFuncVar, LocNewClause};
+            {_, _, Guards, FuncVar, NewClause} = Clause,
+            {FuncVar ++ Guards, NewClause};
         _ ->
-            {_, _, LocFuncVar, _, LocNewClause} = Clause,
-            {LocFuncVar, LocNewClause}
+            {_, _, FuncVar, Guards, NewClause} = Clause,
+            {FuncVar ++ Guards, NewClause}
     end.
 
 match_var([{type_case, AST} | TailClauseAST], Acc) ->

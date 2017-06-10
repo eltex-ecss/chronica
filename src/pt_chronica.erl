@@ -12,7 +12,8 @@
     parse_transform/2,
     parse_str_debug/1,
     format_error/1,
-    generate_module_iface_name/1
+    generate_module_iface_name/1,
+    return_state_log/1
 ]).
 
 -include("chronica_int.hrl").
@@ -40,6 +41,17 @@ parse_transform(AST, Options) ->
     AST4 = pt_versioned:parse_transform(AST3, Options),
     AST5 = pt_macro:parse_transform(AST4, Options),
     add_successful_transform(AST5).
+
+%return_state_log
+return_state_log(AST) ->
+    ListFuncAST = [
+        {type_func, LocAST} || LocAST <- pt_lib:match(AST, ast_pattern("$_/$_ [...$_...]."))
+    ],
+    CreateDataLogAST = pt_chronica_optimization:creat_data_log_ast(),
+    [
+        StatVar#stat_var{deactive_var = maps:new(), deactive_var_log = maps:new()} ||
+            StatVar <- lists:foldl(CreateDataLogAST, [], ListFuncAST)
+    ].
 
 %parse_str_debug
 parse_str_debug(Str) ->
@@ -214,14 +226,7 @@ replace_fake_log(AST, disable_log_mode) ->
     ),
     {AST2, []};
 replace_fake_log(AST, optimization_log_mode) ->
-    ListFuncAST = [
-        {type_func, LocAST} || LocAST <- pt_lib:match(AST, ast_pattern("$_/$_ [...$_...]."))
-    ],
-    CreateDataLogAST = pt_chronica_optimization:creat_data_log_ast(),
-    DataStateLog = [
-        StatVar#stat_var{deactive_var = maps:new(), deactive_var_log = maps:new()} ||
-            StatVar <- lists:foldl(CreateDataLogAST, [], ListFuncAST)
-    ],
+    DataStateLog = return_state_log(AST),
     MatchVar =
         fun(StatVar, Acc) ->
             ListDeactiveLog = pt_chronica_optimization:init_match_var([StatVar], []),
