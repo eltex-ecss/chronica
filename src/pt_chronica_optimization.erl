@@ -49,9 +49,12 @@ init_match_var([StatVar | TailClause], Acc) ->
                 log_replace(clause_replace(NewClause)), DeactiveVar, any_var
             ),
             NewDeactiveVar2 = maps:fold(check_active_var(), NewDeactiveVar, NewActiveVar),
-            {NewDeactiveVar3, NewActiveVar2} = maps:fold(
-                deactive_into_active(), {NewDeactiveVar2, NewActiveVar}, NewDeactiveVar2
+            NewActiveVar2 = maps:fold(
+                deactive_into_active(2),
+                NewActiveVar,
+                lists:foldl(find_deactive_var(), NewDeactiveVar2, [StatVar])
             ),
+            NewDeactiveVar3 = maps:fold(check_active_var(), NewDeactiveVar2, NewActiveVar2),
             case maps:fold(check_active_var(), FilterVarLog, NewActiveVar2) of
                 [] ->
                     init_match_var(TailClause, Acc);
@@ -89,6 +92,84 @@ creat_data_log_ast() ->
                     {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
             ],
             DataLogAST ++ Acc;
+        ({type_receive, AST}, Acc) ->
+            {_, _, ClausesAST} = AST,
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, [], type_receive) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
+            ],
+            DataLogAST ++ Acc;
+        ({type_receive_after, AST}, Acc) ->
+            {_, _, ClausesAST, VarAfterAST, AfterAST} = AST,
+            NewClausesAST = [{clause, 0, [VarAfterAST], [], AfterAST} | ClausesAST],
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, [], type_receive_after) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], NewClausesAST)
+            ],
+            DataLogAST ++ Acc;
+        ({type_if, AST}, Acc) ->
+            {_, _, ClausesAST} = AST,
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, [], type_if) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
+            ],
+            DataLogAST ++ Acc;
+        ({type_try_catch, AST}, Acc) ->
+            {_, _, VarTryAST, [], ClausesAST, []} = AST,
+            NewClausesAST = [{clause, 0, [], [], VarTryAST} | ClausesAST],
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, [], type_try_catch) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], NewClausesAST)
+            ],
+            DataLogAST ++ Acc;
+        ({type_try_case_catch, AST}, Acc) ->
+            {_, _, VarTryAST, ClausesAST1, ClausesAST2, []} = AST,
+            NewClausesAST = ClausesAST1 ++ ClausesAST2,
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, [VarTryAST], type_try_case_catch) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], NewClausesAST)
+            ],
+            DataLogAST ++ Acc;
+        ({type_try_after, AST}, Acc) ->
+            {_, _, VarTryAST, [], [], AfterAST} = AST,
+            ClausesAST = [{clause, 0, [], [], AfterAST}, {clause, 0, [], [], VarTryAST}],
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, [], type_try_after) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
+            ],
+            DataLogAST ++ Acc;
+        ({type_try_case_after, AST}, Acc) ->
+            {_, _, VarTryAST, ClausesAST, [], AfterAST} = AST,
+            NewClausesAST = [{clause, 0, [], [], AfterAST} | ClausesAST],
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, [VarTryAST], type_try_case_after) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], NewClausesAST)
+            ],
+            DataLogAST ++ Acc;
+        ({type_try_catch_after, AST}, Acc) ->
+            {_, _, VarTryAST, [], ClausesAST, AfterAST} = AST,
+            NewClausesAST = [{clause, 0, [], [], AfterAST}, {clause, 0, [], [], VarTryAST} | ClausesAST],
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, [], type_try_catch_after) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], NewClausesAST)
+            ],
+            DataLogAST ++ Acc;
+        ({type_try_case_catch_after, AST}, Acc) ->
+            {_, _, VarTryAST, ClausesAST1, ClausesAST2, AfterAST} = AST,
+            NewClausesAST1 = ClausesAST1 ++ ClausesAST2,
+            NewClausesAST2 = [{clause, 0, [], [], AfterAST} | NewClausesAST1],
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, [VarTryAST], type_try_case_catch_after) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], NewClausesAST2)
+            ],
+            DataLogAST ++ Acc;
+        ({type_fun, AST}, Acc) ->
+            {_, _, {_, ClausesAST}} = AST,
+            DataLogAST = [
+                init_stat_var(undef, ClauseAST, VarLogAST, [], type_fun) ||
+                    {ClauseAST, VarLogAST} <- lists:foldl(pattern_log(), [], ClausesAST)
+            ],
+            DataLogAST ++ Acc;
         (_, Acc) ->
             Acc
     end.
@@ -96,7 +177,7 @@ creat_data_log_ast() ->
 %format_warning
 format_warning([{Var, {Line, _}} | TailListWarning], FullFile) ->
     io:format(
-        "~ts:~p: Warning: variable ~p is unused anywhere except logs of chronica. ~n",
+        "~ts:~p: Warning: variable ~p is unused anywhere except logs of chronica ~n",
         [FullFile, Line, Var]
     ),
     format_warning(TailListWarning, FullFile);
@@ -114,22 +195,22 @@ final_match_var([StatVar | TailStateLog], Acc) ->
         clause = Clause
     } = StatVar,
     NewClause = pt_lib:first_clause(Clause, ast_pattern("(...$_...) -> ...$_... .", _)),
-    NewClause2 = match_var(NewClause, []),
-    case NewClause2 of
+    NewClause2 =
+        case NewClause of
+            [] ->
+                pt_lib:first_clause(Clause, ast_pattern("if [...$_...] end.", _));
+            _ ->
+                NewClause
+        end,
+    NewClause3 = match_var(NewClause2, []),
+    case NewClause3 of
         [] ->
             final_match_var(TailStateLog, [DeactiveVarLog | Acc]);
         _ ->
-            Data = lists:foldl(creat_data_log_ast(), [], NewClause2),
-            FindDeactiveVar =
-                fun(LocStatVar, AccDeactiveVar) ->
-                    {_, LocNewClause} = return_clause_header(
-                        LocStatVar#stat_var.type_clause, LocStatVar#stat_var.clause
-                    ),
-                    filter_var(log_replace(LocNewClause), AccDeactiveVar, repeate_var)
-                end,
-            DeactiveVar2 = lists:foldl(FindDeactiveVar, DeactiveVar, Data),
-            {_, ActiveVar2} = maps:fold(
-                deactive_into_active(), {DeactiveVar2, ActiveVar}, DeactiveVar2
+            Data = lists:foldl(creat_data_log_ast(), [], NewClause3),
+            DeactiveVar2 = lists:foldl(find_deactive_var(), DeactiveVar, Data),
+            ActiveVar2 = maps:fold(
+                deactive_into_active(1), ActiveVar, DeactiveVar2
             ),
             DataStateLog = [
                 LocStatVar#stat_var{
@@ -139,7 +220,7 @@ final_match_var([StatVar | TailStateLog], Acc) ->
                         LocStatVar#stat_var.active_var, ActiveVar2, any_var
                     )
                 }
-                || LocStatVar <- lists:foldl(creat_data_log_ast(), [], NewClause2)
+                || LocStatVar <- lists:foldl(creat_data_log_ast(), [], NewClause3)
             ],
             ResDeactiveLog = init_match_var(DataStateLog, []),
             final_match_var(TailStateLog, ResDeactiveLog ++ Acc)
@@ -147,12 +228,20 @@ final_match_var([StatVar | TailStateLog], Acc) ->
 final_match_var(_, Acc) ->
     Acc.
 
+find_deactive_var() ->
+    fun(StatVar, AccDeactiveVar) ->
+        {_, NewClause} = return_clause_header(
+            StatVar#stat_var.type_clause, StatVar#stat_var.clause
+        ),
+        filter_var(log_replace(NewClause), AccDeactiveVar, repeate_var)
+    end.
+
 return_clause_header(TypeClause, Clause) ->
     case TypeClause of
-        type_func ->
-            {_, _, LocFuncVar, _, LocNewClause} = Clause,
+        type_if ->
+            {_, _, _, LocFuncVar, LocNewClause} = Clause,
             {LocFuncVar, LocNewClause};
-        type_case ->
+        _ ->
             {_, _, LocFuncVar, _, LocNewClause} = Clause,
             {LocFuncVar, LocNewClause}
     end.
@@ -208,15 +297,13 @@ filter_var(VarAST, Maps, TypeUpdate) ->
         end,
     FilterVar(VarAST, Maps).
 
-deactive_into_active() ->
-    fun(KeyVarAST, {Line, CountVarAST}, {MapDeactive, MapActive} = Map) ->
-        case CountVarAST > 1 of
+deactive_into_active(Count) ->
+    fun(KeyVarAST, {Line, CountVarAST}, MapActive) ->
+        case CountVarAST > Count of
             true ->
-                NewMapDeactive = maps:remove(KeyVarAST, MapDeactive),
-                NewMapActive = maps:put(KeyVarAST, {Line, CountVarAST}, MapActive),
-                {NewMapDeactive, NewMapActive};
+                maps:put(KeyVarAST, {Line, CountVarAST}, MapActive);
             false ->
-                Map
+                MapActive
         end
     end.
 
