@@ -27,7 +27,6 @@ parse_transform(AST, _) ->
 %%%===================================================================
 %%% Internal API
 %%%===================================================================
-%todo_out
 todo_out({_, _, Format}, [], File, Module, Line, Acc) ->
     {ok, Cwd} = file:get_cwd(),
     FullFile = filename:join(Cwd, File),
@@ -43,7 +42,6 @@ todo_out(_, View_warrning, File, Module, Line, Acc) ->
     Tags = [Module, LogId],
     {ast("ok.", Line), [Tags|Acc]}.
 
-%fun_arity
 fun_arity(Level, Iface, Module, Line, File, ICall, Acc, Arity, Chronica_Tags) ->
     case mapFunToPriority(Level) of
         {ok, Priority} ->
@@ -137,8 +135,7 @@ args_count([$~ | Tail], N, Line) ->
 args_count([_ | Tail], N, Line) ->
     args_count(Tail, N, Line).
 
-args_count2([C | Tail], Line) when C == $.; C == $-; C == $0; C == $1; C == $2; C == $3;
-                                   C == $4; C == $5; C == $6; C == $7; C == $8; C == $9 ->
+args_count2([C | Tail], Line) when C == $.; C == $-; (C >= $0 andalso C =< $9) ->
     args_count2(Tail, Line);
 args_count2([C | Tail], _Line) when C == $~; C == $n ->
     {0, Tail};

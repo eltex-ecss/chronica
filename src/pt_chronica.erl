@@ -52,39 +52,7 @@ return_state_log(AST) ->
     ].
 
 parse_str_debug(Str) ->
-    ToAST =
-        fun (Str1) ->
-            Line = 0,
-            case erl_scan:string(Str1, Line) of
-                {ok, Tokens, _} ->
-                    case erl_parse:parse_form(Tokens) of
-                        {ok, Abs} -> {ok, [Abs]};
-                        {error, ParseFormError} ->
-                            case erl_parse:parse_exprs(Tokens) of
-                                {ok, List} -> {ok, List};
-                                {error, ParseExprsError} ->
-                                    ?PATROL_ERROR(
-                                        "Error when parsing string  "
-                                        "\"~s\"~nparse_form: ~s~n"
-                                        "parse_exprs: ~s",
-                                        [
-                                            Str1,
-                                            pt_supp:format_errors(ParseFormError),
-                                            pt_supp:format_errors(ParseExprsError)
-                                        ]
-                                    ),
-                                    {error, ParseExprsError}
-                            end
-                    end;
-                {error, ScanErrorInfo, _ScanEndLocation} ->
-                    ?PATROL_ERROR(
-                        "Error when parsing string \"~s\":~n ~s",
-                        [Str1, pt_supp:format_errors(ScanErrorInfo)]
-                    ),
-                    {error, ScanErrorInfo}
-            end
-        end,
-    {ok, A} = ToAST(Str),
+    {ok, A} = str_to_ast(Str),
     AST = parse_transform(
         [
             {attribute, 0, file, {"test.erl", 0}},
@@ -98,6 +66,37 @@ parse_str_debug(Str) ->
         end,
     ResStr = pt_lib:ast2str(ResAST),
     io:format("\""++ResStr++"\"", []).
+
+str_to_ast(Str) ->
+    Line = 0,
+    case erl_scan:string(Str, Line) of
+        {ok, Tokens, _} ->
+            case erl_parse:parse_form(Tokens) of
+                {ok, Abs} -> {ok, [Abs]};
+                {error, ParseFormError} ->
+                    case erl_parse:parse_exprs(Tokens) of
+                        {ok, List} -> {ok, List};
+                        {error, ParseExprsError} ->
+                            ?PATROL_ERROR(
+                                "Error when parsing string  "
+                                "\"~s\"~nparse_form: ~s~n"
+                                "parse_exprs: ~s",
+                                [
+                                    Str,
+                                    pt_supp:format_errors(ParseFormError),
+                                    pt_supp:format_errors(ParseExprsError)
+                                ]
+                            ),
+                            {error, ParseExprsError}
+                    end
+            end;
+        {error, ScanErrorInfo, _ScanEndLocation} ->
+            ?PATROL_ERROR(
+                "Error when parsing string \"~s\":~n ~s",
+                [Str, pt_supp:format_errors(ScanErrorInfo)]
+            ),
+            {error, ScanErrorInfo}
+    end.
 
 format_error({list_forget_var, Args}) ->
     io_lib:format("Args parameter should be list: ~p, (use _ to skip error)", [Args]);
