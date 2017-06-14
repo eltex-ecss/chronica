@@ -12,12 +12,12 @@
 
 -include("chronica.hrl").
 -export([
-         module_log_without_args_test/0,
-         module_log_with_args_test/0,
-         module_log_with_unicode_test/0,
-         module_with_todo_test/0,
-         module_log_with_env_depend_args_test/0
-        ]).
+    module_log_without_args_test/0,
+    module_log_with_args_test/0,
+    module_log_with_unicode_test/0,
+    module_with_todo_test/0,
+    module_log_with_env_depend_args_test/0
+]).
 
 module_log_without_args_test() ->
     log:debug("Test string!"),
