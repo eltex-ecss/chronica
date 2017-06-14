@@ -318,16 +318,19 @@ pattern_log(ClauseAST, Acc) ->
     end.
 
 maps_update_count({_, Line, Var}, Map) ->
-    Fun = fun({L, V}) -> {L, V + 1} end,
-    maps:update_with(Var, Fun, {Line, 1}, Map).
+    case maps:get(Var, Map, false) of
+        false ->
+            maps:put(Var, {Line, 1}, Map);
+        {LocLine, N} ->
+            maps:update(Var, {LocLine, N + 1}, Map)
+    end.
 
 maps_update_uuid_count({_, _, Var}, Map) ->
-    Fun = fun({L, V}) -> {L, V + 1} end,
-    case maps:is_key(Var, Map) of
-        true ->
-            maps:update_with(Var, Fun, Map);
+    case maps:get(Var, Map, false) of
         false ->
-            Map
+            Map;
+        {Line, N} ->
+            maps:update(Var, {Line, N + 1}, Map)
     end.
 
 clause_replace(ClauseAST) ->
