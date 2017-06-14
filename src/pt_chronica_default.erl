@@ -103,14 +103,17 @@ set_activate({Type, CountLine, Param, Tail}, CurrentPosition, Positions, Chronic
     {Type, CountLine, Param, Tail2}.
 
 check_log_params({string, Line, Format}, Args, _) when pt_lib:is_list(Args) ->
-    case catch pt_lib:list_length(Args) of
+    try pt_lib:list_length(Args) of
         N when is_integer(N) ->
             case args_count(Format, 0, Line) == N of
                 true -> ok;
                 false ->
                     throw(?mk_parse_error(Line, {bad_log_args_num, pt_lib:ast2str(Args)}))
-            end;
-        InvalidLength ->
+            end
+    catch
+        throw:Error ->
+            throw(?mk_parse_error(Line, Error));
+        _:InvalidLength ->
             throw(?mk_parse_error(Line, {invalid_args_length, InvalidLength}))
     end;
 check_log_params(VarStr, Args, _Line) when pt_lib:is_variable(VarStr), pt_lib:is_list(Args) ->

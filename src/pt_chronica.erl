@@ -28,7 +28,6 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
-%parse_transform
 parse_transform(AST, Options) ->
     check_transform(AST),
     io:setopts([{encoding, unicode}]),
@@ -42,18 +41,16 @@ parse_transform(AST, Options) ->
     AST5 = pt_macro:parse_transform(AST4, Options),
     add_successful_transform(AST5).
 
-%return_state_log
 return_state_log(AST) ->
     ListFuncAST = [
         {type_func, LocAST} || LocAST <- pt_lib:match(AST, ast_pattern("$_/$_ [...$_...]."))
     ],
-    CreateDataLogAST = pt_chronica_optimization:creat_data_log_ast(),
+    CreateDataLogAST = fun pt_chronica_optimization:create_data_log_ast/2,
     [
         StatVar#stat_var{deactive_var = maps:new(), deactive_var_log = maps:new()} ||
             StatVar <- lists:foldl(CreateDataLogAST, [], ListFuncAST)
     ].
 
-%parse_str_debug
 parse_str_debug(Str) ->
     ToAST =
         fun (Str1) ->
@@ -102,7 +99,6 @@ parse_str_debug(Str) ->
     ResStr = pt_lib:ast2str(ResAST),
     io:format("\""++ResStr++"\"", []).
 
-%format_error
 format_error({list_forget_var, Args}) ->
     io_lib:format("Args parameter should be list: ~p, (use _ to skip error)", [Args]);
 format_error({invalid_args, Str, Args}) ->
@@ -135,7 +131,6 @@ format_error(multiple_transform) ->
 format_error(Unknown) ->
     io_lib:format("Unknown error: ~p~n", [Unknown]).
 
-%generate_module_iface_name
 generate_module_iface_name(Module) ->
     case string:tokens(erlang:atom_to_list(Module), ".") of
         [_] -> generate_module_iface_name_(Module);
@@ -156,13 +151,7 @@ replacement_mode(CompileOptions) ->
         true ->
             disable_log_mode;
         false ->
-            FlagChronicaOptimization = lists:member(chronica_optimization, CompileOptions),
-            case os:getenv("CHRONICA_OPTIMIZATION") =/= false orelse FlagChronicaOptimization of
-                true ->
-                    optimization_log_mode;
-                false ->
-                    default_log_mode
-            end
+            optimization_log_mode
     end.
 
 replace_fake_log(AST, default_log_mode) ->
