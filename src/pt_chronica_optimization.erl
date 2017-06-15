@@ -11,7 +11,8 @@
 -export([
     init_match_var/2,
     create_data_log_ast/2,
-    format_warning/2
+    format_warning/2,
+    delete_ignored_var/2
 ]).
 
 -include("chronica_pt.hrl").
@@ -177,6 +178,20 @@ format_warning([{Var, {Line, _}} | TailListWarning], FullFile) ->
     format_warning(TailListWarning, FullFile);
 format_warning(_, _) ->
     ok.
+
+delete_ignored_var([DataVar = {Var, {_, _}} | TailListWarning], Acc) ->
+    [IgnoreVarFlag1 | _] = Ignore = erlang:atom_to_list(Var),
+    [IgnoreVarFlag2 | _] = lists:reverse(Ignore),
+    NewAcc =
+        case IgnoreVarFlag1 =:= $_ orelse IgnoreVarFlag2 =:= $_ of
+            true ->
+                Acc;
+            false ->
+                [DataVar | Acc]
+        end,
+    delete_ignored_var(TailListWarning, NewAcc);
+delete_ignored_var(_, Acc) ->
+    lists:reverse(Acc).
 
 %%%===================================================================
 %%% Internal functions

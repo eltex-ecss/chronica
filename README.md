@@ -4,10 +4,10 @@
 </p>
 [This document translated on russian](https://github.com/eltex-ecss/chronica/blob/master/README_RU.md)
 
-##Overview
+## Overview
 Chronica is a framework for logging messages for Erlang OTP Applications.
 
-##Features
+## Features
 * [Faster, lightweight, more flexible!](https://docs.google.com/document/d/1S4-Yf799d5SDCWhr78Fsm6-EY98gd1BRW-Qffaynzsc/edit?usp=sharing)
 * Pinning log flows to different outputs (file, tty, network)
 * Custom rules (as regexp) and text formatting for output are supported.
@@ -25,7 +25,7 @@ Chronica is a framework for logging messages for Erlang OTP Applications.
 * Change log level and rules in runtime
 * Custom tags for easy filtered logs
 
-##Usages
+## Usages
 In order to add Chronica into your application you will need to add it as Erlang
 dependency in app file and also set compiler options:
 ```erlang
@@ -191,6 +191,31 @@ If you want define custom formatter:
 {flows, [ {file, "warning_log", my_default} ] },
 {formats, [ {my_default, “%Message”} ] }
 ```
+## Compilation modes
+Chronica supports three compilation modes
+* <b>chronica optimization</b>. Optimization mode (Default). In this mode, Chronica generates warnings about the initialized variables in the function body, that are not used anywhere except log:level(...). To avoid receiving warnings, declare variables as \_Var or Var\_.
+* <b>chronica default</b>. Mode with optimization turned off. Early this mode was the default.
+* <b>chronica disabled</b>. The mode in which chronica cuts out log:level(...).
+
+#### Compilation Options
+Are used to define the behavior at compile time chronica. The options can be set in two ways
+* Using environment variables:
+    * CHRONICA_MATCH_IGNORED_VAR
+    * CHRONICA_DISABLED
+    * CHRONICA_DEFAULT
+* In the rebar.config section of erl_opts
+    * chronica_match_ignored_var
+    * chronica_disabled
+    * chronica_default
+
+#### CHRONICA_MATCH_IGNORED_VAR || chronica_match_ignored_var
+The options is used in the <b>chronica optimization</b> mode and allows you to output variables that have been declared as \_Var or Var\_
+
+#### CHRONICA_DISABLED || chronica_disabled
+The options is used to activate the mode <b>chronica disabled</b>
+
+#### CHRONICA_DEFAULT || chronica_default
+The options is used to activate the mode <b>chronica default</b>
 
 ## Runtime API
 ### For update Chronica configuration in runtime usages:
