@@ -233,7 +233,11 @@ Chronica поддерживает три режима компиляции
     * CHRONICA_MATCH_IGNORED_VAR
     * CHRONICA_DISABLED
     * CHRONICA_DEFAULT
-* В rebar.config в секции erl_opts
+* Через параметры компилятора erlang
+    * chronica_match_ignored_var
+    * chronica_disabled
+    * chronica_default
+* Объявив поле compile(Option) в файле
     * chronica_match_ignored_var
     * chronica_disabled
     * chronica_default

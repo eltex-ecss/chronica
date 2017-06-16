@@ -145,14 +145,13 @@ check_transform(_AST) ->
     ok.
 
 replacement_mode(CompileOptions, AST) ->
-    BoolOption = bool_chronica_option(CompileOptions, chronica_disabled, "CHRONICA_DISABLED"),
+    BoolOption = bool_chronica_option(CompileOptions, chronica_disabled, AST),
     case BoolOption of
         true ->
             disable_log_mode;
         false ->
-            BoolOption2 = bool_chronica_option(CompileOptions, chronica_default, "CHRONICA_DEFAULT"),
-            FlagChronicaDefault = BoolOption2 orelse return_chronica_default(AST),
-            case FlagChronicaDefault of
+            BoolOption2 = bool_chronica_option(CompileOptions, chronica_default, AST),
+            case BoolOption2 of
                 true ->
                     default_log_mode;
                 false ->
@@ -160,11 +159,11 @@ replacement_mode(CompileOptions, AST) ->
             end
     end.
 
-return_chronica_default([{attribute, _, compile, default_log_mode} | _]) ->
+return_chronica_default([{attribute, _, compile, FlagAST} | _], FlagAST) ->
     true;
-return_chronica_default([_ | TailAST]) ->
-    return_chronica_default(TailAST);
-return_chronica_default(_) ->
+return_chronica_default([_ | TailAST], FlagAST) ->
+    return_chronica_default(TailAST, FlagAST);
+return_chronica_default(_, _) ->
     false.
 
 replace_fake_log(AST, _, default_log_mode) ->
@@ -243,9 +242,7 @@ replace_fake_log(AST, Options, optimization_log_mode) ->
     {ok, Cwd} = file:get_cwd(),
     FullFile = filename:join(Cwd, File),
 
-    BoolOption = bool_chronica_option(
-        Options, chronica_match_ignored_var, "CHRONICA_MATCH_IGNORED_VAR"
-    ),
+    BoolOption = bool_chronica_option(Options, chronica_match_ignored_var, AST),
     ListWarning2 =
         case BoolOption of
             true ->
@@ -256,9 +253,11 @@ replace_fake_log(AST, Options, optimization_log_mode) ->
     pt_chronica_optimization:format_warning(ListWarning2, FullFile),
     replace_fake_log(AST, Options, default_log_mode).
 
-bool_chronica_option(Options, FlagOption1, FlagOption2) ->
+bool_chronica_option(Options, FlagOption1, AST) ->
     FlagChronicaVar = lists:member(FlagOption1, Options),
-    os:getenv(FlagOption2) =/= false orelse FlagChronicaVar.
+    FlagOption2 = string:to_upper(erlang:atom_to_list(FlagOption1)),
+    FlagAST = return_chronica_default(AST, FlagOption1),
+    os:getenv(FlagOption2) =/= false orelse FlagChronicaVar orelse FlagAST.
 
 search_control_symbol(_, true) ->
     true;

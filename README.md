@@ -207,6 +207,10 @@ Are used to define the behavior at compile time chronica. The options can be set
     * chronica_match_ignored_var
     * chronica_disabled
     * chronica_default
+* Declaring the compile(Option) field in the file
+    * chronica_match_ignored_var
+    * chronica_disabled
+    * chronica_default
 
 #### CHRONICA_MATCH_IGNORED_VAR || chronica_match_ignored_var
 This option is used only in the <b>chronica optimization</b> mode and allows you to display warnings about variables that are declared as \Var_
