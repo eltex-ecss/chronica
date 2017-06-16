@@ -180,10 +180,9 @@ format_warning(_, _) ->
     ok.
 
 delete_ignored_var([DataVar = {Var, {_, _}} | TailListWarning], Acc) ->
-    [IgnoreVarFlag1 | _] = Ignore = erlang:atom_to_list(Var),
-    [IgnoreVarFlag2 | _] = lists:reverse(Ignore),
+    [IgnoreVarFlag1 | _] = lists:reverse(erlang:atom_to_list(Var)),
     NewAcc =
-        case IgnoreVarFlag1 =:= $_ orelse IgnoreVarFlag2 =:= $_ of
+        case IgnoreVarFlag1 =:= $_ of
             true ->
                 Acc;
             false ->

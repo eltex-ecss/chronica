@@ -193,7 +193,7 @@ If you want define custom formatter:
 ```
 ## Compilation modes
 Chronica supports three compilation modes
-* <b>chronica optimization</b>. Optimization mode (Default). In this mode, Chronica generates warnings about the initialized variables in the function body, that are not used anywhere except log:level(...). To avoid receiving warnings, declare variables as \_Var or Var\_.
+* <b>chronica optimization</b>. Optimization mode (Default). In this mode, Chronica allows you to display warnings about variables that are declared in the function body, but are used only in the log:level (...). To avoid receiving warnings, declare variables as \Var_.
 * <b>chronica default</b>. Mode with optimization turned off. Early this mode was the default.
 * <b>chronica disabled</b>. The mode in which chronica cuts out log:level(...).
 
@@ -203,13 +203,13 @@ Are used to define the behavior at compile time chronica. The options can be set
     * CHRONICA_MATCH_IGNORED_VAR
     * CHRONICA_DISABLED
     * CHRONICA_DEFAULT
-* In the rebar.config section of erl_opts
+* Support erlang compile options
     * chronica_match_ignored_var
     * chronica_disabled
     * chronica_default
 
 #### CHRONICA_MATCH_IGNORED_VAR || chronica_match_ignored_var
-The options is used in the <b>chronica optimization</b> mode and allows you to output variables that have been declared as \_Var or Var\_
+This option is used only in the <b>chronica optimization</b> mode and allows you to display warnings about variables that are declared as \Var_
 
 #### CHRONICA_DISABLED || chronica_disabled
 The options is used to activate the mode <b>chronica disabled</b>

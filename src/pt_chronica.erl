@@ -145,14 +145,14 @@ check_transform(_AST) ->
     ok.
 
 replacement_mode(CompileOptions, AST) ->
-    FlagChronicaDisabled = lists:member(chronica_disabled, CompileOptions),
-    case os:getenv("CHRONICA_DISABLED") =/= false orelse FlagChronicaDisabled of
+    BoolOption = bool_chronica_option(CompileOptions, chronica_disabled, "CHRONICA_DISABLED"),
+    case BoolOption of
         true ->
             disable_log_mode;
         false ->
-            FlagChronicaDefault = lists:member(chronica_default, CompileOptions),
-            FlagChronicaDefault2 = FlagChronicaDefault orelse return_chronica_default(AST),
-            case os:getenv("CHRONICA_DEFAULT") =/= false orelse FlagChronicaDefault2 of
+            BoolOption2 = bool_chronica_option(CompileOptions, chronica_default, "CHRONICA_DEFAULT"),
+            FlagChronicaDefault = BoolOption2 orelse return_chronica_default(AST),
+            case FlagChronicaDefault of
                 true ->
                     default_log_mode;
                 false ->
@@ -242,9 +242,12 @@ replace_fake_log(AST, Options, optimization_log_mode) ->
     File = pt_lib:get_file_name(AST),
     {ok, Cwd} = file:get_cwd(),
     FullFile = filename:join(Cwd, File),
-    FlagChronicaVar = lists:member(chronica_match_ignored_var, Options),
+
+    BoolOption = bool_chronica_option(
+        Options, chronica_match_ignored_var, "CHRONICA_MATCH_IGNORED_VAR"
+    ),
     ListWarning2 =
-        case os:getenv("CHRONICA_MATCH_IGNORED_VAR") =/= false orelse FlagChronicaVar of
+        case BoolOption of
             true ->
                 ListWarning;
             false ->
@@ -252,6 +255,10 @@ replace_fake_log(AST, Options, optimization_log_mode) ->
         end,
     pt_chronica_optimization:format_warning(ListWarning2, FullFile),
     replace_fake_log(AST, Options, default_log_mode).
+
+bool_chronica_option(Options, FlagOption1, FlagOption2) ->
+    FlagChronicaVar = lists:member(FlagOption1, Options),
+    os:getenv(FlagOption2) =/= false orelse FlagChronicaVar.
 
 search_control_symbol(_, true) ->
     true;
