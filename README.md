@@ -4,10 +4,10 @@
 </p>
 [This document translated on russian](https://github.com/eltex-ecss/chronica/blob/master/README_RU.md)
 
-##Overview
+## Overview
 Chronica is a framework for logging messages for Erlang OTP Applications.
 
-##Features
+## Features
 * [Faster, lightweight, more flexible!](https://docs.google.com/document/d/1S4-Yf799d5SDCWhr78Fsm6-EY98gd1BRW-Qffaynzsc/edit?usp=sharing)
 * Pinning log flows to different outputs (file, tty, network)
 * Custom rules (as regexp) and text formatting for output are supported.
@@ -25,7 +25,7 @@ Chronica is a framework for logging messages for Erlang OTP Applications.
 * Change log level and rules in runtime
 * Custom tags for easy filtered logs
 
-##Usages
+## Usages
 In order to add Chronica into your application you will need to add it as Erlang
 dependency in app file and also set compiler options:
 ```erlang
@@ -191,6 +191,35 @@ If you want define custom formatter:
 {flows, [ {file, "warning_log", my_default} ] },
 {formats, [ {my_default, “%Message”} ] }
 ```
+## Compilation modes
+Chronica supports three compilation modes
+* <b>chronica optimization</b>. Optimization mode (Default). In this mode, Chronica allows you to display warnings about variables that are declared in the function body, but are used only in the log:level (...). To avoid receiving warnings, declare variables as \Var_.
+* <b>chronica default</b>. Mode with optimization turned off. Early this mode was the default.
+* <b>chronica disabled</b>. The mode in which chronica cuts out log:level(...).
+
+#### Compilation Options
+Are used to define the behavior at compile time chronica. The options can be set in two ways
+* Using environment variables:
+    * CHRONICA_MATCH_IGNORED_VAR
+    * CHRONICA_DISABLED
+    * CHRONICA_DEFAULT
+* Support erlang compile options
+    * chronica_match_ignored_var
+    * chronica_disabled
+    * chronica_default
+* Declaring the compile(Option) field in the file
+    * chronica_match_ignored_var
+    * chronica_disabled
+    * chronica_default
+
+#### CHRONICA_MATCH_IGNORED_VAR || chronica_match_ignored_var
+This option is used only in the <b>chronica optimization</b> mode and allows you to display warnings about variables that are declared as \Var_
+
+#### CHRONICA_DISABLED || chronica_disabled
+The options is used to activate the mode <b>chronica disabled</b>
+
+#### CHRONICA_DEFAULT || chronica_default
+The options is used to activate the mode <b>chronica default</b>
 
 ## Runtime API
 ### For update Chronica configuration in runtime usages:

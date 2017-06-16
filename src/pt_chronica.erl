@@ -34,7 +34,7 @@ parse_transform(AST, Options) ->
     ?PATROL_DEBUG("options: ~p", [Options]),
     AST0 = pt_fun_trace:parse_transform(AST, Options),
     AST1 = AST0,
-    {AST2, ListOfId} = replace_fake_log(AST1, replacement_mode(Options)),
+    {AST2, ListOfId} = replace_fake_log(AST1, Options, replacement_mode(Options, AST)),
     Module = pt_lib:get_module_name(AST),
     AST3 = add_get_log_tags_fun(lists:usort([[Module] | ListOfId]), AST2),
     AST4 = pt_versioned:parse_transform(AST3, Options),
@@ -144,16 +144,29 @@ check_transform([_HeadAST1, _HeadAST2, {attribute, 0, option, successful_transfo
 check_transform(_AST) ->
     ok.
 
-replacement_mode(CompileOptions) ->
-    FlagChronicaDisabled = lists:member(chronica_disabled, CompileOptions),
-    case os:getenv("CHRONICA_DISABLED") =/= false orelse FlagChronicaDisabled of
+replacement_mode(CompileOptions, AST) ->
+    BoolOption = bool_chronica_option(CompileOptions, chronica_disabled, AST),
+    case BoolOption of
         true ->
             disable_log_mode;
         false ->
-            optimization_log_mode
+            BoolOption2 = bool_chronica_option(CompileOptions, chronica_default, AST),
+            case BoolOption2 of
+                true ->
+                    default_log_mode;
+                false ->
+                    optimization_log_mode
+            end
     end.
 
-replace_fake_log(AST, default_log_mode) ->
+return_chronica_default([{attribute, _, compile, FlagAST} | _], FlagAST) ->
+    true;
+return_chronica_default([_ | TailAST], FlagAST) ->
+    return_chronica_default(TailAST, FlagAST);
+return_chronica_default(_, _) ->
+    false.
+
+replace_fake_log(AST, _, default_log_mode) ->
     File = pt_lib:get_file_name(AST),
     ?PATROL_DEBUG("parse transforming: ~s", [File]),
     Module = pt_lib:get_module_name(AST),
@@ -205,7 +218,7 @@ replace_fake_log(AST, default_log_mode) ->
             )
         }], []
     );
-replace_fake_log(AST, disable_log_mode) ->
+replace_fake_log(AST, _, disable_log_mode) ->
     {AST2, _} = pt_lib:replace_fold(AST, [
         {
             {ast_pattern("log:$_(...$_...).", _Line), Acc},
@@ -213,7 +226,7 @@ replace_fake_log(AST, disable_log_mode) ->
         }], []
     ),
     {AST2, []};
-replace_fake_log(AST, optimization_log_mode) ->
+replace_fake_log(AST, Options, optimization_log_mode) ->
     DataStateLog = return_state_log(AST),
     MatchVar =
         fun(StatVar, Acc) ->
@@ -228,8 +241,23 @@ replace_fake_log(AST, optimization_log_mode) ->
     File = pt_lib:get_file_name(AST),
     {ok, Cwd} = file:get_cwd(),
     FullFile = filename:join(Cwd, File),
-    pt_chronica_optimization:format_warning(ListWarning, FullFile),
-    replace_fake_log(AST, default_log_mode).
+
+    BoolOption = bool_chronica_option(Options, chronica_match_ignored_var, AST),
+    ListWarning2 =
+        case BoolOption of
+            true ->
+                ListWarning;
+            false ->
+                pt_chronica_optimization:delete_ignored_var(ListWarning, [])
+        end,
+    pt_chronica_optimization:format_warning(ListWarning2, FullFile),
+    replace_fake_log(AST, Options, default_log_mode).
+
+bool_chronica_option(Options, FlagOption1, AST) ->
+    FlagChronicaVar = lists:member(FlagOption1, Options),
+    FlagOption2 = string:to_upper(erlang:atom_to_list(FlagOption1)),
+    FlagAST = return_chronica_default(AST, FlagOption1),
+    os:getenv(FlagOption2) =/= false orelse FlagChronicaVar orelse FlagAST.
 
 search_control_symbol(_, true) ->
     true;

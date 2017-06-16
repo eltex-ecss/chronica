@@ -2,11 +2,11 @@
 <img src="https://raw.githubusercontent.com/eltex-ecss/chronica/master/doc/chronica.jpg"/>
 </p>
 
-##Общее представление
+## Общее представление
 Chronica это специальный фреймворк используемый для логирования сообщений в Erlang.
 Он осуществляет более простой способ введения журналов в Erlang-приложениях.
 
-##Особенности
+## Особенности
 * [Быстрее, легче, гибче!](https://docs.google.com/document/d/1S4-Yf799d5SDCWhr78Fsm6-EY98gd1BRW-Qffaynzsc/edit?usp=sharing)
 * Вывод потока логов различными способами (в файл, на экран,
     по сети)
@@ -113,7 +113,7 @@ end
 ```
 В правилах хорошего тона, лучше все вызовы, контекстно зависимые от процессора, выполнять в данном процессоре, а результаты помещать в переменную.
 
-##log:todo
+## log:todo
 Применяется для того чтобы отследить участок кода, который считается
 незавершённым. Работает только с константными данными, и выводит данное
 напоминие как предупреждение компилятора.
@@ -130,7 +130,7 @@ Out:
     (полный путь)/chronica_testing.erl:214: TODO: Need more tests!!!
 ```
 
-##Конфигурационный файл
+## Конфигурационный файл
 Добавте секицю в sys.congig:
 ```
 {chronica, [
@@ -221,7 +221,37 @@ Out:
  {short, "%Y-%M-%D %H:%Mi:%S:%Ms %P %Pid [%Module:%Line]: %Message\n"}
 ```
 
-##Настройка на лету
+## Режимы компиляции
+Chronica поддерживает три режима компиляции
+* <b>chronica optimization</b>. Режим оптимизации (установленный по умолчанию). В данном режиме Chronica позволяет выводить предупреждения о переменных, которые объявлены в теле функции, но ипользуются только в вызовах log:level(...). Для того, чтобы не получать предупреждения, объявляйте переменные как \Var_.
+* <b>chronica default</b>. Режим с выключенной оптимизацией. Раннее данный режим был по умолчанию
+* <b>chronica disabled</b>. Режим в котором chronica вырезает log:level(...).
+
+#### Опции компиляции
+Предназначены для того, чтобы задать поведения chronica во время компиляции. Задаваться опции могут двумя способами
+* С помощью переменных окружения:
+    * CHRONICA_MATCH_IGNORED_VAR
+    * CHRONICA_DISABLED
+    * CHRONICA_DEFAULT
+* Через параметры компилятора erlang
+    * chronica_match_ignored_var
+    * chronica_disabled
+    * chronica_default
+* Объявив поле compile(Option) в файле
+    * chronica_match_ignored_var
+    * chronica_disabled
+    * chronica_default
+
+#### CHRONICA_MATCH_IGNORED_VAR || chronica_match_ignored_var
+Данная опция используется в режиме <b>chronica optimization</b> и позволяет выводить переменные, которые были объявлены как \Var_.
+
+#### CHRONICA_DISABLED || chronica_disabled
+Данная опция используется для включения режима <b>chronica disabled</b>
+
+#### CHRONICA_DEFAULT || chronica_default
+Данная опция используется для включения режима <b>chronica default</b>
+
+## Настройка на лету
 Применяются для модифицирования конфигурационного файла
 * chronica_manager:update_rule_inwork(name_rule, false | true)
 Включает\отключает уже существующие правила.
