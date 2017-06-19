@@ -63,17 +63,20 @@ do_format_test(N) ->
          },
     S1 = "sdajhflkj asdh fasdhf kjghdasf kjdhgasf k agdsh fhdsgaf hasdg "
          "fkjdhasgf kjagsf dfsjg;kl sdlifgydl",
-    X = fun () ->
+    X =
+        fun () ->
             io_lib:format("sakjdf hjhgdsjhgdshghg sdkh gdksjfh ~p "
                           "sfkjhdkjfhgdshg ~s dsf.lkjdkjfhgkdjfhgdhfg ~n "
                           "fdkljlkjgsdfj g fgd  ~n ldkfjglkdfs g  ~p", [P1, S1, P2])
         end,
-    Y = fun () ->
+    Y =
+        fun () ->
             io_lib:format("sakjdf hjhgdsjhgdshghg sdkh gdksjfh ~w "
                           "sfkjhdkjfhgdshg ~s dsf.lkjdkjfhgkdjfhgdhfg ~n "
                           "fdkljlkjgsdfj g fgd  ~n ldkfjglkdfs g  ~w", [P1, S1, P2])
         end,
-    Z = fun () ->
+    Z =
+        fun () ->
             [
              "sakjdf hjhgdsjhgdshghg sdkh gdksjfh ",
              io_lib_pretty:print(P1),
@@ -93,7 +96,6 @@ auto() ->
 
 do_test(Name, TestFun) ->
     io:format(Name , []),
-
     case (catch run_all_tests(TestFun, ok, all)) of
         ok -> io:format(" ok~n", []), ok;
         Err -> io:format(" failed~n", []), Err
@@ -102,12 +104,13 @@ do_test(Name, TestFun) ->
 run_all_tests(TestFun, DefRes, all) ->
     run_all_tests(TestFun, DefRes, 1);
 run_all_tests(TestFun, DefRes, N) ->
-    Res = case catch TestFun(N) of
+    Res =
+        case catch TestFun(N) of
             ok -> ok;
             not_supp ->  io:format("Test ~p... not supported~n", [N]), ok;
             not_impl ->  io:format("Test ~p... not implemented~n", [N]), ok;
             _Err -> io:format("Test ~p... failed~n~p~n", [N, _Err]), failed
-          end,
+        end,
 
     case TestFun(num) of
         N ->
@@ -211,18 +214,21 @@ bombing_proc(N, From) ->
 
 bombing(0) -> ok;
 bombing(N) ->
-    P = self(),
-    io_lib:format("~p ~p sfdgdsfjgsdf g~p sfjdskjh gsd~p",
-                  [{asfdkjh, dfjhgd},
-                   sdjkfsjkdhf,
-                   sadkjfhaskjf,
-                   [
-                    sdfgdsfgdsfg,
-                    dfgsdfgsd,
-                    gsdfgdsgsd,
-                    gsdfgsdfgsdfg,
-                    dsfgsdfgdsgdsfgsdfg,
-                    df
-                   ]]),
-    log:debug(?MODULE, "bombing from ~p", [P]),
+    io_lib:format(
+        "~p ~p sfdgdsfjgsdf g~p sfjdskjh gsd~p",
+        [
+            {asfdkjh, dfjhgd},
+            sdjkfsjkdhf,
+            sadkjfhaskjf,
+            [
+                sdfgdsfgdsfg,
+                dfgsdfgsd,
+                gsdfgdsgsd,
+                gsdfgsdfgsdfg,
+                dsfgsdfgdsgdsfgsdfg,
+                df
+            ]
+        ]
+    ),
+    log:debug(?MODULE, "bombing from ~p", [erlang:self()]),
     bombing(N - 1).
