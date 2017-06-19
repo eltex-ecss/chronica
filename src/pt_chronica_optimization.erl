@@ -61,7 +61,7 @@ init_match_var([StatVar | TailClause], Acc) ->
                 _ ->
                     Log = pt_lib:match(clause_replace(NewClause), ast_pattern("log:$_(...$_...).")),
                     UnfilterDeactiveVarLog = [lists:last(ParamLog) || {_, _, _, ParamLog} <- Log],
-                    DeactiveVarLog2 = filter_var(UnfilterDeactiveVarLog, DeactiveVarLog, any_var),
+                    DeactiveVarLog2 = filter_var(UnfilterDeactiveVarLog, DeactiveVarLog, any_var_save_line),
                     DeactiveVarLog3 = maps:fold(fun check_active_var/3, DeactiveVarLog2, NewActiveVar2),
                     NewStatVar = StatVar#stat_var{
                         active_var = NewActiveVar2,
@@ -73,7 +73,7 @@ init_match_var([StatVar | TailClause], Acc) ->
             end
     end;
 init_match_var(_, Acc) ->
-    final_match_var(Acc, []).
+    final_match_var(Acc, sets:new()).
 
 create_data_log_ast({type_func, AST}, Acc) ->
     {_, _, NameFunc, _, ClausesAST} = AST,
@@ -170,7 +170,7 @@ create_data_log_ast({type_fun, AST}, Acc) ->
 create_data_log_ast(_, Acc) ->
     Acc.
 
-format_warning([{Var, {Line, _}} | TailListWarning], FullFile) ->
+format_warning([{Var, Line} | TailListWarning], FullFile) ->
     io:format(
         "~ts:~p: Warning: variable ~p is unused anywhere except logs of chronica ~n",
         [FullFile, Line, Var]
@@ -179,7 +179,7 @@ format_warning([{Var, {Line, _}} | TailListWarning], FullFile) ->
 format_warning(_, _) ->
     ok.
 
-delete_ignored_var([DataVar = {Var, {_, _}} | TailListWarning], Acc) ->
+delete_ignored_var([{Var, _} = DataVar | TailListWarning], Acc) ->
     [IgnoreVarFlag1 | _] = lists:reverse(erlang:atom_to_list(Var)),
     NewAcc =
         case IgnoreVarFlag1 =:= $_ of
@@ -213,7 +213,9 @@ final_match_var([StatVar | TailStateLog], Acc) ->
     NewClause3 = match_var(NewClause2, []),
     case NewClause3 of
         [] ->
-            final_match_var(TailStateLog, [DeactiveVarLog | Acc]);
+            ListDeactiveVarLog = maps:to_list(DeactiveVarLog),
+            NewAcc = list_log_to_set(ListDeactiveVarLog, Acc),
+            final_match_var(TailStateLog, NewAcc);
         _ ->
             Data = lists:foldl(fun create_data_log_ast/2, [], NewClause3),
             DeactiveVar2 = lists:foldl(fun find_deactive_var/2, DeactiveVar, Data),
@@ -231,7 +233,8 @@ final_match_var([StatVar | TailStateLog], Acc) ->
                 || LocStatVar <- lists:foldl(fun create_data_log_ast/2, [], NewClause3)
             ],
             ResDeactiveLog = init_match_var(DataStateLog, []),
-            final_match_var(TailStateLog, ResDeactiveLog ++ Acc)
+            NewAcc = merge_list_set(sets:to_list(ResDeactiveLog), Acc),
+            final_match_var(TailStateLog, NewAcc)
     end;
 final_match_var(_, Acc) ->
     Acc.
@@ -248,6 +251,23 @@ return_clause_header(type_if, Clause) ->
 return_clause_header(_, Clause) ->
     {_, _, FuncVar, Guards, NewClause} = Clause,
     {FuncVar ++ Guards, NewClause}.
+
+merge_list_set(List, Set) ->
+    F =
+        fun(Elem, LocAcc) ->
+            sets:add_element(Elem, LocAcc)
+        end,
+    lists:foldl(F, Set, List).
+
+list_log_to_set([{Var, {SetLine, _}} | TailList], Acc) ->
+    F =
+        fun(Line, LocAcc) ->
+            sets:add_element({Var, Line}, LocAcc)
+        end,
+    list_log_to_set(TailList, lists:foldl(F, Acc, sets:to_list(SetLine)));
+list_log_to_set(_, Acc) ->
+    Acc.
+
 
 match_var([{type_case, AST} | TailClauseAST], Acc) ->
     [ClauseAST | _] = pt_lib:match(AST, ast_pattern("case $_ of [...$_...] end.", _)),
@@ -294,6 +314,8 @@ filter_var(VarAST, Maps, TypeUpdate) ->
             case TypeUpdate of
                 any_var ->
                     lists:foldl(fun maps_update_count/2, LocMaps, LocVarAST);
+                any_var_save_line ->
+                    lists:foldl(fun maps_update_count_and_line/2, LocMaps, LocVarAST);
                 _ ->
                     lists:foldl(fun maps_update_uuid_count/2, LocMaps, LocVarAST)
             end
@@ -337,6 +359,15 @@ maps_update_count({_, Line, Var}, Map) ->
             maps:put(Var, {Line, 1}, Map);
         {LocLine, N} ->
             maps:update(Var, {LocLine, N + 1}, Map)
+    end.
+
+maps_update_count_and_line({_, Line, Var}, Map) ->
+    case maps:get(Var, Map, false) of
+        false ->
+            Set = sets:new(),
+            maps:put(Var, {sets:add_element(Line, Set), 1}, Map);
+        {LocSet, N} ->
+            maps:update(Var, {sets:add_element(Line, LocSet), N + 1}, Map)
     end.
 
 maps_update_uuid_count({_, _, Var}, Map) ->

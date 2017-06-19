@@ -10,14 +10,12 @@ pt_chronica_test_() ->
             begin
                 [
                     'Log0',
-                    'Log10',
-                    'Log9',
-                    'Log0',
-                    'Log4',
                     'Log1',
                     'Log10',
+                    'Log14',
+                    'Log4',
                     'Log5',
-                    'Log14'
+                    'Log9'
                 ] = flag_chronica_optimization_test()
             end
         )
@@ -31,10 +29,14 @@ flag_chronica_optimization_test() ->
         Log3 = c,
         Log11 = c,
         Log6 = c,
+        log:warning(\"Log: ~p\", [Log0]),
+        log:warning(\"Log: ~p\", [Log0]),
+        log:warning(\"Log: ~p\", [Log0]),
+        log:warning(\"Log: ~p\", [Log0]),
         try
             Log12 = a,
             case Log3 of
-                {a, Res1} ->
+                {a, _Res1} ->
                     fun(Log1, Log5, Log8) ->
                         Log7 = c,
                         Log21 = a,
@@ -101,13 +103,10 @@ flag_chronica_optimization_test() ->
     DataStateLog = pt_chronica:return_state_log(TestAST),
     MatchVar =
         fun(StatVar, Acc) ->
-            ListDeactiveLog = pt_chronica_optimization:init_match_var([StatVar], []),
-            Flatten =
-                fun(DeactiveLog, LocAcc) ->
-                    maps:keys(DeactiveLog) ++ LocAcc
-                end,
-            lists:foldl(Flatten, [], ListDeactiveLog) ++ Acc
+            DeactiveLog = pt_chronica_optimization:init_match_var([StatVar], []),
+            sets:to_list(DeactiveLog) ++ Acc
         end,
-    lists:foldl(MatchVar, [], DataStateLog).
+    ListWarning = lists:keysort(1, lists:foldl(MatchVar, [], DataStateLog)),
+    [Var || {Var, _} <- ListWarning].
 
 -endif. %% TEST

@@ -230,12 +230,8 @@ replace_fake_log(AST, Options, optimization_log_mode) ->
     DataStateLog = return_state_log(AST),
     MatchVar =
         fun(StatVar, Acc) ->
-            ListDeactiveLog = pt_chronica_optimization:init_match_var([StatVar], []),
-            Flatten =
-                fun(DeactiveLog, LocAcc) ->
-                    maps:to_list(DeactiveLog) ++ LocAcc
-                end,
-            lists:foldl(Flatten, [], ListDeactiveLog) ++ Acc
+            DeactiveLog = pt_chronica_optimization:init_match_var([StatVar], []),
+            sets:to_list(DeactiveLog) ++ Acc
         end,
     ListWarning = lists:foldl(MatchVar, [], DataStateLog),
     File = pt_lib:get_file_name(AST),
@@ -250,7 +246,7 @@ replace_fake_log(AST, Options, optimization_log_mode) ->
             false ->
                 pt_chronica_optimization:delete_ignored_var(ListWarning, [])
         end,
-    pt_chronica_optimization:format_warning(ListWarning2, FullFile),
+    pt_chronica_optimization:format_warning(lists:keysort(2, ListWarning2), FullFile),
     replace_fake_log(AST, Options, default_log_mode).
 
 bool_chronica_option(Options, FlagOption1, AST) ->
