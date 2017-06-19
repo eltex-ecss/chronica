@@ -104,7 +104,7 @@ flag_chronica_optimization_test() ->
     MatchVar =
         fun(StatVar, Acc) ->
             DeactiveLog = pt_chronica_optimization:init_match_var([StatVar], []),
-            sets:to_list(DeactiveLog) ++ Acc
+            lists:usort(DeactiveLog) ++ Acc
         end,
     ListWarning = lists:keysort(1, lists:foldl(MatchVar, [], DataStateLog)),
     [Var || {Var, _} <- ListWarning].

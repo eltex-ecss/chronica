@@ -231,7 +231,7 @@ replace_fake_log(AST, Options, optimization_log_mode) ->
     MatchVar =
         fun(StatVar, Acc) ->
             DeactiveLog = pt_chronica_optimization:init_match_var([StatVar], []),
-            sets:to_list(DeactiveLog) ++ Acc
+            lists:usort(DeactiveLog) ++ Acc
         end,
     ListWarning = lists:foldl(MatchVar, [], DataStateLog),
     File = pt_lib:get_file_name(AST),

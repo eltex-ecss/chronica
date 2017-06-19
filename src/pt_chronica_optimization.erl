@@ -73,7 +73,7 @@ init_match_var([StatVar | TailClause], Acc) ->
             end
     end;
 init_match_var(_, Acc) ->
-    final_match_var(Acc, sets:new()).
+    final_match_var(Acc, []).
 
 create_data_log_ast({type_func, AST}, Acc) ->
     {_, _, NameFunc, _, ClausesAST} = AST,
@@ -214,7 +214,7 @@ final_match_var([StatVar | TailStateLog], Acc) ->
     case NewClause3 of
         [] ->
             ListDeactiveVarLog = maps:to_list(DeactiveVarLog),
-            NewAcc = list_log_to_set(ListDeactiveVarLog, Acc),
+            NewAcc = list_log_to_list(ListDeactiveVarLog, Acc),
             final_match_var(TailStateLog, NewAcc);
         _ ->
             Data = lists:foldl(fun create_data_log_ast/2, [], NewClause3),
@@ -233,8 +233,7 @@ final_match_var([StatVar | TailStateLog], Acc) ->
                 || LocStatVar <- lists:foldl(fun create_data_log_ast/2, [], NewClause3)
             ],
             ResDeactiveLog = init_match_var(DataStateLog, []),
-            NewAcc = merge_list_set(sets:to_list(ResDeactiveLog), Acc),
-            final_match_var(TailStateLog, NewAcc)
+            final_match_var(TailStateLog, ResDeactiveLog ++ Acc)
     end;
 final_match_var(_, Acc) ->
     Acc.
@@ -252,20 +251,13 @@ return_clause_header(_, Clause) ->
     {_, _, FuncVar, Guards, NewClause} = Clause,
     {FuncVar ++ Guards, NewClause}.
 
-merge_list_set(List, Set) ->
-    F =
-        fun(Elem, LocAcc) ->
-            sets:add_element(Elem, LocAcc)
-        end,
-    lists:foldl(F, Set, List).
-
-list_log_to_set([{Var, {SetLine, _}} | TailList], Acc) ->
+list_log_to_list([{Var, {ListLine, _}} | TailList], Acc) ->
     F =
         fun(Line, LocAcc) ->
-            sets:add_element({Var, Line}, LocAcc)
+            [{Var, Line} | LocAcc]
         end,
-    list_log_to_set(TailList, lists:foldl(F, Acc, sets:to_list(SetLine)));
-list_log_to_set(_, Acc) ->
+    list_log_to_list(TailList, lists:foldl(F, Acc, ListLine));
+list_log_to_list(_, Acc) ->
     Acc.
 
 
@@ -364,10 +356,9 @@ maps_update_count({_, Line, Var}, Map) ->
 maps_update_count_and_line({_, Line, Var}, Map) ->
     case maps:get(Var, Map, false) of
         false ->
-            Set = sets:new(),
-            maps:put(Var, {sets:add_element(Line, Set), 1}, Map);
-        {LocSet, N} ->
-            maps:update(Var, {sets:add_element(Line, LocSet), N + 1}, Map)
+            maps:put(Var, {[Line], 1}, Map);
+        {LocList, N} ->
+            maps:update(Var, {[Line | LocList], N + 1}, Map)
     end.
 
 maps_update_uuid_count({_, _, Var}, Map) ->
