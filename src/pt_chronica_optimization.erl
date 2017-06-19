@@ -236,7 +236,7 @@ final_match_var([StatVar | TailStateLog], Acc) ->
             final_match_var(TailStateLog, ResDeactiveLog ++ Acc)
     end;
 final_match_var(_, Acc) ->
-    Acc.
+    lists:usort(Acc).
 
 find_deactive_var(StatVar, AccDeactiveVar) ->
     {_, NewClause} = return_clause_header(
@@ -315,10 +315,10 @@ filter_var(VarAST, Maps, TypeUpdate) ->
     FilterVar(VarAST, Maps).
 
 deactive_into_active(Count) ->
-    fun(KeyVarAST, {Line, CountVarAST}, MapActive) ->
+    fun(KeyVarAST, CountVarAST, MapActive) ->
         case CountVarAST > Count of
             true ->
-                maps:put(KeyVarAST, {Line, CountVarAST}, MapActive);
+                maps:put(KeyVarAST, CountVarAST, MapActive);
             false ->
                 MapActive
         end
@@ -345,28 +345,20 @@ pattern_log(ClauseAST, Acc) ->
             [{ClauseAST, VarLogAST} | Acc]
     end.
 
-maps_update_count({_, Line, Var}, Map) ->
-    case maps:get(Var, Map, false) of
-        false ->
-            maps:put(Var, {Line, 1}, Map);
-        {LocLine, N} ->
-            maps:update(Var, {LocLine, N + 1}, Map)
-    end.
+maps_update_count({_, _, Var}, Map) ->
+    N = maps:get(Var, Map, 0),
+    maps:put(Var, N + 1, Map).
 
 maps_update_count_and_line({_, Line, Var}, Map) ->
-    case maps:get(Var, Map, false) of
-        false ->
-            maps:put(Var, {[Line], 1}, Map);
-        {LocList, N} ->
-            maps:update(Var, {[Line | LocList], N + 1}, Map)
-    end.
+    {LocList, N} = maps:get(Var, Map, {[], 0}),
+    maps:put(Var, {[Line | LocList], N + 1}, Map).
 
 maps_update_uuid_count({_, _, Var}, Map) ->
     case maps:get(Var, Map, false) of
         false ->
             Map;
-        {Line, N} ->
-            maps:update(Var, {Line, N + 1}, Map)
+        N ->
+            maps:update(Var, N + 1, Map)
     end.
 
 clause_replace(ClauseAST) ->
