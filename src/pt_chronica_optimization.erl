@@ -41,7 +41,13 @@ init_match_var([StatVar | TailClause], Acc) ->
     FilterVarLog = filter_var(VarLog, maps:new(), any_var),
     case FilterVarLog of
         [] ->
-            init_match_var(TailClause, Acc);
+            NewStatVar = StatVar#stat_var{
+                active_var = ActiveVar,
+                deactive_var_log = DeactiveVarLog,
+                deactive_var = DeactiveVar,
+                clause = []
+            },
+            init_match_var(TailClause, [NewStatVar | Acc]);
         _ ->
             {FuncVar, NewClause} = return_clause_header(TypeClause, Clause),
             NewActiveVar = filter_var(FuncVar, ActiveVar, any_var),
@@ -57,7 +63,13 @@ init_match_var([StatVar | TailClause], Acc) ->
             NewDeactiveVar3 = maps:fold(fun check_active_var/3, NewDeactiveVar2, NewActiveVar2),
             case maps:fold(fun check_active_var/3, FilterVarLog, NewActiveVar2) of
                 [] ->
-                    init_match_var(TailClause, Acc);
+                    NewStatVar = StatVar#stat_var{
+                        active_var = NewActiveVar2,
+                        deactive_var_log = DeactiveVarLog,
+                        deactive_var = NewDeactiveVar3,
+                        clause = []
+                    },
+                    init_match_var(TailClause, [NewStatVar | Acc]);
                 _ ->
                     Log = pt_lib:match(clause_replace(NewClause), ast_pattern("log:$_(...$_...).")),
                     UnfilterDeactiveVarLog = [lists:last(ParamLog) || {_, _, _, ParamLog} <- Log],
@@ -232,8 +244,15 @@ final_match_var([StatVar | TailStateLog], Acc) ->
                 }
                 || LocStatVar <- lists:foldl(fun create_data_log_ast/2, [], NewClause3)
             ],
-            ResDeactiveLog = init_match_var(DataStateLog, []),
-            final_match_var(TailStateLog, ResDeactiveLog ++ Acc)
+            case DataStateLog of
+                [] ->
+                    ListDeactiveVarLog = maps:to_list(DeactiveVarLog),
+                    NewAcc = list_log_to_list(ListDeactiveVarLog, Acc),
+                    final_match_var(TailStateLog, NewAcc);
+                _ ->
+                    ResDeactiveLog = init_match_var(DataStateLog, []),
+                    final_match_var(TailStateLog, ResDeactiveLog ++ Acc)
+            end
     end;
 final_match_var(_, Acc) ->
     lists:usort(Acc).
