@@ -16,12 +16,13 @@ pt_chronica_test_() ->
                     'Log4',
                     'Log5',
                     'Log9'
-                ] = flag_chronica_optimization_test()
+                ] = flag_chronica_optimization_test1()
             end
-        )
+        ),
+        ?_test(begin ['Result'] = flag_chronica_optimization_test2() end)
     ].
 
-flag_chronica_optimization_test() ->
+flag_chronica_optimization_test1() ->
     TestAST = pt_lib:str2ast("handle_call(hello_error, From, State) ->
         Log0 = a,
         Log4 = a,
@@ -100,6 +101,24 @@ flag_chronica_optimization_test() ->
         end,
         {reply, ok, State}.", 1
     ),
+    retun_var(TestAST).
+
+flag_chronica_optimization_test2() ->
+    TestAST = pt_lib:str2ast("handle_call(hello_error, From, _State) ->
+        Req =
+            case From of
+                undefined ->
+                    ok1;
+                _ ->
+                    ok2
+            end,
+        Result = ok,
+        log:debug(\"Result send: ~p\", [Result]),
+        ok.", 1
+    ),
+    retun_var(TestAST).
+
+retun_var(TestAST) ->
     DataStateLog = pt_chronica:return_state_log(TestAST),
     MatchVar =
         fun(StatVar, Acc) ->
