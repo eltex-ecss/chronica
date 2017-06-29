@@ -198,23 +198,29 @@ replace_fake_log(AST, _, default_log_mode) ->
         },
         {
             {ast_pattern("log:$FunName('$String').", Line) = ICall, Acc},
-            pt_chronica_default:fun_arity(
-                FunName, Iface, Module, Line, File,
-                ICall, Acc, {arity_one, String}, Chronica_Tags
+            check_error(
+                pt_chronica_default:fun_arity(
+                    FunName, Iface, Module, Line, File,
+                    ICall, Acc, {arity_one, String}, Chronica_Tags
+                )
             )
         },
         {
             {ast_pattern("log:$FunName('$String', '$Args').", Line) = ICall, Acc},
-            pt_chronica_default:fun_arity(
-                FunName, Iface, Module, Line, File,
-                ICall, Acc, {arity_two, String, Args}, Chronica_Tags
+            check_error(
+                pt_chronica_default:fun_arity(
+                    FunName, Iface, Module, Line, File,
+                    ICall, Acc, {arity_two, String, Args}, Chronica_Tags
+                )
             )
         },
         {
             {ast_pattern("log:$FunName('$Tags', '$String', '$Args').", Line) = ICall, Acc},
-            pt_chronica_default:fun_arity(
-                FunName, Iface, Module, Line, File,
-                ICall, Acc, {arity_three, String, Args, Tags}, Chronica_Tags
+            check_error(
+                pt_chronica_default:fun_arity(
+                    FunName, Iface, Module, Line, File,
+                    ICall, Acc, {arity_three, String, Args, Tags}, Chronica_Tags
+                )
             )
         }], []
     );
@@ -266,6 +272,11 @@ search_control_symbol([Param | Tail], _) ->
         {_, control, _} ->
             search_control_symbol(Tail, true)
     end.
+
+check_error({error, {Line, DataError}}) ->
+    throw(?mk_parse_error(Line, DataError));
+check_error(OkData) ->
+    OkData.
 
 -spec find_implicit_tags(erl_syntax:syntaxTree(), [atom()]) -> [atom()].
 find_implicit_tags([], Acc) ->
