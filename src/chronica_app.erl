@@ -22,7 +22,7 @@ start(_Type, StartArgs) ->
     io:format("Starting Chronica... ~n", []),
     Now = os:timestamp(),
 
-    Config = case chronica_manager:read_config(Now) of
+    Config = case chronica_config:read(Now) of
         {ok, Cfg} ->
             NewBckends = Cfg#chronica_config.backend_modules ++
                 [{file, chronica_file_backend}],

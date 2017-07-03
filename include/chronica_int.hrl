@@ -51,3 +51,13 @@
     open_params :: term(),
     writer_options :: term()
     }).
+
+-type rule() :: string() | {string(), rule()} | {string(), rule(), rule()}.
+-record(rule,
+    {
+        id = 0 :: integer(),
+        rule_str = "*"   :: rule(),
+        log_priority = 0 :: integer(),
+        flows :: [term()]
+    }).
+
