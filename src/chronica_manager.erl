@@ -33,7 +33,7 @@
     load_config/1,
     remove_tcp_connection/2,
     rotate/0,
-    test_add_module/1,
+    generate_iface_module/1,
     update_rule_inwork/2,
     update_rule_inwork/3
    ]).
@@ -425,8 +425,8 @@ handle_call({add_application, App}, _From, State =
     {reply, Res, State#config_state{registered_applications = NewRApps,
                         cache = NewCache, cache_timer = NewIsCacheTimerStarted}};
 
-handle_call({test_add_module, Module}, _From, #config_state{rules = Rules} = State) ->
-    ?INT_DBG("test_add_module received ~p", [Module]),
+handle_call({generate_iface_module, Module}, _From, #config_state{rules = Rules} = State) ->
+    ?INT_DBG("generate_iface_module received ~p", [Module]),
     Code = chronica_iface:generate_iface_module(Module, Rules),
     catch load_app_iface_modules([{Module, Code}]),
     {reply, ok, State};
@@ -703,8 +703,8 @@ add_rule(NameRule, Mask, Priority, Flow) when is_atom(NameRule) ->
 add_rule(NameRule, Mask, Priority, Flow, Fun) when is_atom(NameRule) ->
     gen_server:call(?MODULE, {add_rule, NameRule, Mask, Priority, Flow, Fun}, infinity).
 
-test_add_module(Module) ->
-    gen_server:call(?MODULE, {test_add_module, Module}).
+generate_iface_module(Module) ->
+    gen_server:call(?MODULE, {generate_iface_module, Module}).
 
 close_outputs([Handle | Tail], Timeout) ->
     ?INT_DBG("Close of output ~p cause termination", [Handle]),

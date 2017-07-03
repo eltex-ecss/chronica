@@ -23,6 +23,8 @@
     register/1,
     register/0,
     load_config/1,
+    add_rule/4,
+    generate_iface_module/1,
     get_tty_config/0
     ]).
 
@@ -43,52 +45,30 @@ register(App) ->
     chronica_manager:add_application(App).
 
 activate() ->
-    try
-        chronica_manager:active(true)
-    catch
-        C:E ->
-            ?INT_EXCEPT("Exception: ~p:~p", [C, E]),
-            {error, E}
-    end.
+    run_try_manager(active, [true]).
 
 deactivate() ->
-    try
-        chronica_manager:active(false)
-    catch
-        C:E ->
-            ?INT_EXCEPT("Exception: ~p:~p", [C, E]),
-            {error, E}
-    end.
+    run_try_manager(active, [false]).
+
+-spec add_rule(NameRule :: atom(), Mask :: nonempty_string(),
+    Priority :: chronica_priority(), Flow :: atom()) -> ok | {error, _Reason}.
+add_rule(NameRule, Mask, Priority, Flow) ->
+    run_try_manager(add_rule, [NameRule, Mask, Priority, Flow]).
 
 clear_log(FlowId) ->
-    try
-        chronica_manager:clear_log(FlowId)
-    catch
-        C:E ->
-            ?INT_EXCEPT("Exception: ~p:~p", [C, E]),
-            {error, E}
-    end.
+    run_try_manager(clear_log, [FlowId]).
 
 clear_log() ->
     clear_log('').
 
 rotate() ->
-    try
-        chronica_manager:rotate()
-    catch
-        C:E ->
-            ?INT_EXCEPT("Exception: ~p:~p", [C, E]),
-            {error, E}
-    end.
+    run_try_manager(rotate, []).
 
 load_config(Config) ->
-    try
-        chronica_manager:load_config(Config)
-    catch
-        C:E ->
-            ?INT_EXCEPT("Exception: ~p:~p", [C, E]),
-            {error, E}
-    end.
+    run_try_manager(load_config, [Config]).
+
+generate_iface_module(Module) ->
+    run_try_manager(generate_iface_module, [Module]).
 
 get_tty_config() ->
     #chronica_config{
@@ -107,4 +87,13 @@ get_tty_config() ->
         tcp_port = undefined,
         tcp_host = any,
         backend_modules = []
-        }.
+      }.
+
+run_try_manager(Function, Args) ->
+    try
+        erlang:apply(chronica_manager, Function, Args)
+    catch
+        C:E ->
+            ?INT_EXCEPT("Exception: ~p:~p", [C, E]),
+            {error, E}
+    end.
