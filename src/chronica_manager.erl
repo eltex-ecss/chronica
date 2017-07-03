@@ -77,7 +77,7 @@
         rules :: [#rule{}] | null,
         flows :: [term()] | null,
         create_time :: {integer(), integer(), integer()},
-        registered_applications = [chronica] :: [atom()],
+        registered_applications :: sets:set(module()),
         cache = [],
         config_hash = undefined,
         cache_timer = false
@@ -125,7 +125,8 @@ init(Params) ->
                 loaded_config = #chronica_config{},
                 rules = null,
                 flows = null,
-                create_time = Now
+                create_time = Now,
+                registered_applications = sets:from_list([chronica])
                 },
 
         NewState =
@@ -1353,41 +1354,45 @@ add_application(App, RApps, Rules, Cache, Detail_info) ->
     add_application(App, RApps, Rules, Cache, Detail_info, undefined).
 
 add_application(App, RApps, Rules, Cache, Detail_info, TickFun) ->
-    ?INT_DBG("-> rq add_application ~p \\ ~p", [App, RApps]),
     try
-        case lists:member(App, RApps) of
-            true -> {ok, {RApps, Cache}};
-            false ->
-                ?INT_DBG("-> Rq Reg ~100000p \\ ~100000p \\ is_list(Cache): ~10000000000000p~n", [App, RApps, is_list(Cache)]),
-                case add_application_in_cache(App, RApps, Rules, Cache, Detail_info, TickFun) of
-                    % Applicatin successfully added in cache.
-                    {ok, {NewRApps, NewCache}} ->
-                        DepApps0 = case application:get_key(App, applications) of
-                                       {ok, L0} -> L0;
-                                       _ -> []
-                                   end,
-                        DepApps = case application:get_key(App, included_applications) of
-                                      {ok, [_ | _] = L1} -> L1 ++ DepApps0;
-                                      _ -> DepApps0
-                                  end,
-                        AddAppsRecurciveFun =
-                            fun (A, {Added, CacheAcc}) ->
-                                    case add_application(A, Added, Rules, CacheAcc, Detail_info, TickFun) of
-                                        {ok, {NewAdded, NewCacheAcc}} -> {NewAdded, NewCacheAcc};
-                                        {Error, {NewAdded, NewCacheAcc}} -> throw({Error, {NewAdded, NewCacheAcc}})
-                                    end
-                            end,
-                        {ResultRApps, ResultCache} = lists:foldl(AddAppsRecurciveFun, {NewRApps, NewCache}, DepApps),
-                        {ok, {ResultRApps, ResultCache}};
-                    % Error during add application in cache.
-                    {Error, ErrorArgs} ->
-                        {Error, ErrorArgs}
-                end
-        end
+        add_application_(App, RApps, Rules, Cache, Detail_info, TickFun)
     catch
         throw:{Err, NRA} ->
             ?INT_ERR("reg ~p failed \\ ~p~n", [App, NRA]),
             {Err, NRA}
+    end.
+
+add_application_(App, RApps, Rules, Cache, Detail_info, TickFun) ->
+    ?INT_DBG("-> rq add_application ~p \\ ~p", [App, RApps]),
+    case sets:is_element(App, RApps) of
+        true ->
+            {ok, {RApps, Cache}};
+        false ->
+            ?INT_DBG("-> Rq Reg ~100000p \\ ~100000p \\ is_list(Cache): ~10000000000000p~n", [App, RApps, is_list(Cache)]),
+            case add_application_in_cache(App, RApps, Rules, Cache, Detail_info, TickFun) of
+                % Applicatin successfully added in cache.
+                {ok, {NewRApps, NewCache}} ->
+                    DepApps0 = case application:get_key(App, applications) of
+                                   {ok, L0} -> L0;
+                                   _ -> []
+                               end,
+                    DepApps = case application:get_key(App, included_applications) of
+                                  {ok, [_ | _] = L1} -> L1 ++ DepApps0;
+                                  _ -> DepApps0
+                              end,
+                    AddAppsRecurciveFun =
+                    fun (A, {Added, CacheAcc}) ->
+                            case add_application_(A, Added, Rules, CacheAcc, Detail_info, TickFun) of
+                                {ok, {NewAdded, NewCacheAcc}} -> {NewAdded, NewCacheAcc};
+                                {Error, {NewAdded, NewCacheAcc}} -> throw({Error, {NewAdded, NewCacheAcc}})
+                            end
+                    end,
+                    {ResultRApps, ResultCache} = lists:foldl(AddAppsRecurciveFun, {NewRApps, NewCache}, DepApps),
+                    {ok, {ResultRApps, ResultCache}};
+                % Error during add application in cache.
+                {Error, ErrorArgs} ->
+                    {Error, ErrorArgs}
+            end
     end.
 
 %%--------------------------------------------------------------------
@@ -1404,7 +1409,7 @@ add_application_in_cache(App, RApps, Rules, Cache, Detail_info, TickFun) ->
                 ?INT_DBG("~p chronica interface was loaded from cache", [App]),
                 load_app_iface_modules(AppModulesCode),
                 ?INT_DBG("Registered (from cache) \\ ~p~n", [[App | RApps]]),
-                {ok, {[App | RApps], Cache}};
+                {ok, {sets:add_element(App, RApps), Cache}};
             % no cache or old cache
             _Cached ->
                 AppModulesCode = case Detail_info of
@@ -1423,7 +1428,7 @@ add_application_in_cache(App, RApps, Rules, Cache, Detail_info, TickFun) ->
                 end,
                 load_app_iface_modules(AppModulesCode),
                 ?INT_DBG("Registered \\ ~p~n", [[App | RApps]]),
-                {ok, {[App | RApps], [{App, {AppHash, AppModulesCode}} | proplists:delete(App, Cache)]}}
+                {ok, {sets:add_element(App, RApps), [{App, {AppHash, AppModulesCode}} | proplists:delete(App, Cache)]}}
         end
     catch
         _:Error ->
@@ -1455,16 +1460,8 @@ generate_app_iface_modules(App, Rules) ->
         end, [], AppModules).
 
 generate_iface_module(ModuleName, Rules) ->
-    TagList =
-        case (catch ModuleName:get_log_tags()) of
-            Tags when is_list(Tags) -> Tags;
-            _ -> []
-        end,
-
-    case TagList of
-        [] ->
-            undefined;
-        _ ->
+    case (catch ModuleName:get_log_tags()) of
+        TagList when is_list(TagList) ->
             timer:sleep(5), % reduce overload
             IfaceName = pt_chronica:generate_module_iface_name(ModuleName),
             AST  = pt_lib:create_clear_ast(IfaceName),
@@ -1495,7 +1492,8 @@ generate_iface_module(ModuleName, Rules) ->
                 Error ->
                     ?INT_ERR("log interface module compilation error: ~p", [Error]),
                     erlang:error(log_iface_module_compilation_error, Error)
-            end
+            end;
+        _ -> undefined
     end.
 
 generate_clauses(TagList, FlowsList) ->
@@ -1596,6 +1594,8 @@ split_pair_braket_(")" ++ Tail, _Acc1, _BN) -> throw({invalid_braket, Tail});
 split_pair_braket_("(" ++ Tail, Acc1, BN) -> split_pair_braket_(Tail, [$(|Acc1], BN + 1);
 split_pair_braket_([C|Tail], Acc1, BN) -> split_pair_braket_(Tail, [C|Acc1], BN).
 
+depended_from_chronica(lager) ->
+    true;
 depended_from_chronica(chronica) ->
     true;
 depended_from_chronica(App) ->
@@ -1633,14 +1633,14 @@ config_hash(#chronica_config{active = Active, rules = Rules, flows = Flows}) ->
     erlang:md5(erlang:term_to_binary({Active, Rules, Flows})).
 
 add_all_applications(RegApps, NewRules, Cache, Detail_info, TickFun) ->
-    lists:foldl(
+    sets:fold(
         fun (App, {RAAcc, CacheAcc}) ->
             case add_application(App, RAAcc, NewRules, CacheAcc, Detail_info, TickFun) of
                 {ok, NRA} -> NRA;
                 {AAErr, _NRA} -> throw(AAErr)
             end
         end,
-        {[], Cache},
+        {sets:new(), Cache},
         RegApps).
 
 load_cache(CacheDir, ConfigHash) ->
