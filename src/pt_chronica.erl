@@ -32,14 +32,18 @@ parse_transform(AST, Options) ->
     check_transform(AST),
     io:setopts([{encoding, unicode}]),
     ?PATROL_DEBUG("options: ~p", [Options]),
-    AST0 = pt_fun_trace:parse_transform(AST, Options),
-    AST1 = AST0,
+    AST1 = pt_fun_trace:parse_transform(AST, Options),
     {AST2, ListOfId} = replace_fake_log(AST1, Options, replacement_mode(Options, AST)),
     Module = pt_lib:get_module_name(AST),
-    AST3 = add_get_log_tags_fun(lists:usort([[Module] | ListOfId]), AST2),
-    AST4 = pt_versioned:parse_transform(AST3, Options),
-    AST5 = pt_macro:parse_transform(AST4, Options),
-    add_successful_transform(AST5).
+    case AST2 == AST1 of
+        %% Not found usaging log:_
+        true -> AST;
+        _ ->
+            AST3 = add_get_log_tags_fun(lists:usort([[Module] | ListOfId]), AST2),
+            AST4 = pt_versioned:parse_transform(AST3, Options),
+            AST5 = pt_macro:parse_transform(AST4, Options),
+            add_successful_transform(AST5)
+    end.
 
 return_state_log(AST) ->
     ListFuncAST = [
