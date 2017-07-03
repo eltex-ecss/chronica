@@ -12,10 +12,10 @@
 -record(chronica_rule,
         {
             id       :: atom() | any(),
-            mask     :: string() | any(), % use *, ?, |, !
-            priority :: debug | trace | info | warning | error | nothing,
-            flow_ids :: [chronica_flow_id()],
-            in_work  :: true | false
+            mask     = "" :: string() | any(), % use *, ?, |, !
+            priority = nothing :: debug | trace | info | warning | error | nothing,
+            flow_ids = [] :: [chronica_flow_id()],
+            in_work  = true :: true | false
         }).
 
 -type chronica_tty_backend()  :: tty.
