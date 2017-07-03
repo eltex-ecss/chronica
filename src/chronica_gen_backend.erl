@@ -90,7 +90,7 @@ clear({Output, Handle}) ->
         _:E -> {error, {E, erlang:get_stacktrace()}}
     end.
 
--spec check({atom(), outputHandle()}) -> ok | {error, term()}.
+-spec check({atom(), outputHandle()}) -> true | {error, term()}.
 
 check({Output, Handle}) ->
     try
