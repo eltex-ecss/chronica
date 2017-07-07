@@ -282,7 +282,7 @@ check_error({error, {Line, DataError}}) ->
 check_error(OkData) ->
     OkData.
 
--spec find_implicit_tags(erl_syntax:syntaxTree(), [atom()]) -> [atom()].
+-spec find_implicit_tags([any()], [any()]) -> [any()].
 find_implicit_tags([], Acc) ->
     lists:usort(Acc);
 find_implicit_tags([{attribute, _, chronica_tag, Param} | Tail], Acc) when is_atom(Param)->
