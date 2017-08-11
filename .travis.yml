@@ -5,6 +5,7 @@ before_install:
     - chmod +x rebar
     - chmod +x relx
 script: "./rebar -V && make travis"
+dist: precise
 otp_release:
     - 17.5
     - 18.0
