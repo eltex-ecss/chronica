@@ -127,7 +127,11 @@ search_frame_start_(<<16#AB, 16#CD, 16#EF, Size:32, _:Size/binary, _Tail/bytes>>
 search_frame_start_(<<E, Tail/bytes>>, Res) -> search_frame_start_(Tail, <<Res/binary, E>>).
 
 default({{{Y,Mo,D},{H,Mi,S},Ms}, Priority, Module, Pid, Line, _File, _Function, {F, A}}) ->
-    UserStr = io_lib:format(F, A),
+    UserStr = try
+                  io_lib:format(F, A)
+              catch
+                  _:_ -> io_lib:format("~tp", [{F,A}])
+              end,
     io_lib:format("~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B:~6.10.0B ~s ~p [~w:~b]: ~ts~n", [Y, Mo, D, H, Mi, S, Ms, get_priority_prefix_up(Priority), Pid, Module, Line, UserStr]).
 
 get_priority_prefix_up(Priority) ->
