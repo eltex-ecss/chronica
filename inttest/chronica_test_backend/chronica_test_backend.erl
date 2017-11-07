@@ -24,7 +24,7 @@ test() ->
     init:stop().
 
 check_true_test() ->
-    timer:sleep(2000),
+    timer:sleep(5000),
     {ok, Cwd} = file:get_cwd(),
     testing1(Cwd),
     testing2(Cwd),
@@ -60,7 +60,7 @@ testing6(Cwd) ->
 assert([Head | Tail], Final_result) when Final_result == Head, Tail == []->
     ok;
 assert(_, _) ->
-    error_tests.
+    erlang:throw({error_tests, "Tests failed or are long executed"}).
 
 get_data_file(Cwd) ->
     {ok, Testing1} = file:read_file(Cwd),
