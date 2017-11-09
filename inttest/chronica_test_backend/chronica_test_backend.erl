@@ -19,19 +19,25 @@ test() ->
 
     log:error([testing6], "testing_rising_log", []),
     log:debug([testing6], "testing_rising_log", []),
-
-    check_true_test(),
+    check_true_test(1),
     init:stop().
 
-check_true_test() ->
-    timer:sleep(2000),
-    {ok, Cwd} = file:get_cwd(),
-    testing1(Cwd),
-    testing2(Cwd),
-    testing3(Cwd),
-    testing4(Cwd),
-    testing5(Cwd),
-    testing6(Cwd).
+check_true_test(N) when N < 5 ->
+    try
+        timer:sleep(1000 * N),
+        {ok, Cwd} = file:get_cwd(),
+        testing1(Cwd),
+        testing2(Cwd),
+        testing3(Cwd),
+        testing4(Cwd),
+        testing5(Cwd),
+        testing6(Cwd)
+    catch
+        _:_ ->
+            check_true_test(N + 1)
+    end;
+check_true_test(_) ->
+    erlang:throw({error_tests, "Tests failed or are long executed"}).
 
 testing1(Cwd) ->
     Data_file = get_data_file(Cwd ++ "/log/file_testing1.log"),
@@ -60,7 +66,7 @@ testing6(Cwd) ->
 assert([Head | Tail], Final_result) when Final_result == Head, Tail == []->
     ok;
 assert(_, _) ->
-    error_tests.
+    erlang:throw({error_tests, "Tests failed or are long executed"}).
 
 get_data_file(Cwd) ->
     {ok, Testing1} = file:read_file(Cwd),
