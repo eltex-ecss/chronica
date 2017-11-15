@@ -139,23 +139,23 @@ and name formats.
 For example:
 
 ```erlang
-{warning_file, [{file, "warning.log"}]},
+{warning_file, [{file, [{name, "warning.log"}]}]},
 ```
 Define "warning_file" flow output data in file with "warning.log" filename in
 default format and text mode.
 
 ```erlang
-{warning_file, [{file, "warning.log", binary}]},
+{warning_file, [{file, [{name, "warning.log",}, {format, binary}]}]},
 ```
 As previous example but in binary mode
 
 ```erlang
-{warning_file, [{tty, custom_format}]},
+{warning_file, [{tty, [{format, custom_format}]}]},
 ```
 Flow output in terminal in "custom_format" format
 
 ```erlang
-{journald, [{journald, short}]},
+{journald, [{journald, [{format, short}]}]},
 ```
 Flow output in journald (if exist)
 
@@ -173,14 +173,14 @@ Examples:
 
 ```erlang
 default flow
-{flows, [{screen, [{tty, default}]}] }
+{flows, [{screen, [{tty, [{format, default}]}]}]}
 Out:
     2015-09-27 14:59:32.012401 WARN  <0.130.0> [testing_chronica_logs:testing_short_warning_file/1:57]: test chronica
 ```
 
 Override default:
 ```
-{flows, [ {screen, [ {tty, default} ] } ] },
+{flows, [{screen, [{tty, [{format, default}]}]}]},
 {formats,[{default, "%H:%Mi:%S.%Ms [%Priority] %Message\n"}]},
 Out:
     15:03:15.702088 [warning] test chronica
@@ -188,8 +188,8 @@ Out:
 
 If you want define custom formatter:
 ```erlang
-{flows, [ {file, "warning_log", my_default} ] },
-{formats, [ {my_default, “%Message”} ] }
+{flows, [{file, [{name, "warning_log"}, {format, my_default}]}]},
+{formats, [{my_default, “%Message”}]}
 ```
 ## Compilation modes
 Chronica supports three compilation modes
