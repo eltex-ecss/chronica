@@ -166,7 +166,8 @@ parse_flows(BadFormated, _WriterOptions, _Backends) ->
     ?INT_ERR("Bad formated list of flows near ~p", [BadFormated]),
     erlang:throw({parse_flows, bad_format}).
 
-parse_flow([#chronica_backend{type = {Type, OpenParam}, format = Format} = Output | Tail], WriterOptions, BackendModules) ->
+parse_flow([#chronica_backend{} = Output | Tail], WriterOptions, BackendModules) ->
+    #chronica_backend{type = {Type, OpenParam}, format = Format} = Output,
     case proplists:get_value(tty_enabled, WriterOptions, true) of
         false when Type == tty -> parse_flow(Tail, WriterOptions, BackendModules);
         _  ->
@@ -184,7 +185,7 @@ parse_flow([#chronica_backend{type = {Type, OpenParam}, format = Format} = Outpu
                     end,
                     case erlang:function_exported(chronica_format, FormatType, 1) of
                         true -> ok;
-                        false ->
+                        _ ->
                             ?INT_ERR("Bad format of output ~p near ~p", [Output, FormatType]),
                             erlang:throw({parse_flow, bad_format_type})
                     end,
@@ -335,6 +336,9 @@ read_flows_tty([{FlowId, List}| Tail], Res, EndLineFormatsName) when is_atom(Flo
     end.
 
 read_writers_tty([], Res) -> Res;
+read_writers_tty([{tty, List} | Tail], Res) when erlang:is_list(List) ->
+    TTY = read_writers_tty_(List, [default]),
+    read_writers_tty(Tail, TTY ++ Res);
 read_writers_tty([tty | Tail], Res) ->
     read_writers_tty(Tail, [default | Res]);
 read_writers_tty([{tty, Format} | Tail], Res) ->
@@ -346,22 +350,46 @@ read_writers_tty([{_Type, _Params, _Format} | Tail], Res) ->
 read_writers_tty([W | _Tail], _Res) ->
     throw({bad_config, {bad_writer_tty, W}}).
 
+read_writers_tty_([], Res) ->
+    Res;
+read_writers_tty_([{format, Format} | Tail], _) when erlang:is_atom(Format) ->
+    read_writers_tty_(Tail, [Format]);
+read_writers_tty_([{mailbox_tty, _} | Tail], Res) ->
+    read_writers_tty_(Tail, Res);
+read_writers_tty_(W, _) ->
+    throw({bad_config, {bad_writer_tty, W}}).
+
 read_flows([], Res) -> Res;
 read_flows([{FlowId, List} | Tail], Res) when is_atom(FlowId), is_list(List) ->
     Writers = read_writers(List, []),
     read_flows(Tail, [#chronica_flow{flow_id = FlowId, backends = Writers} | Res]).
 
 read_writers([], Res) -> Res;
+read_writers([{Type, List} | Tail], Res) when erlang:is_list(List) ->
+    read_writers(Tail, [backend_tty(List, #chronica_backend{type = {Type, undefined}, format = default}) | Res]);
 read_writers([tty | Tail], Res) ->
     read_writers(Tail, [#chronica_backend{type = {tty, undefined}, format = default} | Res]);
 read_writers([{tty, Format} | Tail], Res) ->
     read_writers(Tail, [#chronica_backend{type = {tty, undefined}, format = Format} | Res]);
-read_writers([{Type, Params}|Tail], Res) ->
+read_writers([{Type, Params} |Tail], Res) ->
     read_writers(Tail, [#chronica_backend{type = {Type, Params}, format = default}|Res]);
 read_writers([{Type, Params, Format}|Tail], Res) ->
     read_writers(Tail, [#chronica_backend{type = {Type, Params}, format = Format}|Res]);
 read_writers([W | _Tail], _Res) ->
     throw({bad_config, {bad_writer, W}}).
+
+backend_tty([{format, Format} | Tail], ChrBack) when erlang:is_atom(Format) ->
+    backend_tty(Tail, ChrBack#chronica_backend{format = Format});
+backend_tty([{mailbox_tty, Limit}  | Tail], ChrBack = #chronica_backend{type = {tty, _}}) ->
+    backend_tty(Tail, ChrBack#chronica_backend{type = {tty, Limit}});
+backend_tty([{name, Name} | Tail], ChrBack = #chronica_backend{type = {file, _}}) ->
+    backend_tty(Tail, ChrBack#chronica_backend{type = {file, Name}});
+backend_tty([{udp_opt, Opt} | Tail], ChrBack = #chronica_backend{type = {udp, _}}) ->
+    backend_tty(Tail, ChrBack#chronica_backend{type = {udp, Opt}});
+backend_tty([{_Type, _Param} | Tail], ChrBack) ->
+    backend_tty(Tail, ChrBack);
+backend_tty([], ChrBack) ->
+    ChrBack.
 
 search_format_id(_FormatId, []) -> false;
 search_format_id(FormatId, [#chronica_format{format_id = Name} | Tail]) ->

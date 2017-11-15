@@ -187,16 +187,16 @@ Flows - это именованные потоки, которые пишут д
 
 Пример:
 ```erlang
-{warning_file, [{file, "debug.bin", binary}]},
+{warning_file, [{file, [{name, "debug.bin"}, {format, binary}]}]},
 Поток будет писать в debug.bin, дефолтным форматом, в бинарном виде
 
-{warning_file, [{file, "warning.txt"}]},
+{warning_file, [{file, [{name, "warning.txt"}]}]},
 Поток будет писать в warning.txt, дефолтным форматом, в текстовом виде
 
-{warning_file, [{tty, short}]},
+{warning_file, [{tty, [{format, short}]}]},
 Поток будет писать на консоль, short форматом, в текстовом виде
 
-{journald, [{journald, short}]},
+{journald, [{journald, [{format, short}]}]},
 Поток будет писать в journald (Если установлен)
 ```
 
@@ -211,7 +211,7 @@ Flows - это именованные потоки, которые пишут д
 без переопределенного заголовка из поля format.
 ```erlang
 default по умолчанию
-{flows, [{screen, [{tty, default}]}] }
+{flows, [{screen, [{tty, [{format, default}]}]}]}
 Out:
     2015-09-27 14:59:32.012401 WARN  <0.130.0> [testing_chronica_logs:testing_short_warning_file/1:57]: test chronica
 

@@ -17,16 +17,13 @@
 -export([handle_open/3, handle_close/1, handle_write/4, handle_clear/1, handle_rotate/1, handle_check/1]).
 -export([start/0, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--define(max_mailbox_len, 1000).
 -define(wait_before_restart, 1000).
 -define(wait_for_old_proc, 100000).
 
--record(s,
-        {
-        }).
+-record(s, {mailbox_len = 1000}).
 
-handle_open(_, _, Files) ->
-    case start() of
+handle_open(TTYLimit, _, Files) ->
+    case start(TTYLimit) of
         {ok, Handle} ->
             {ok, Handle, Files};
         Other ->
@@ -55,13 +52,18 @@ handle_check(_Handle) ->
     false.
 
 start() ->
-    case gen_server:start({local, ?MODULE}, ?MODULE, [], []) of
+    start([]).
+
+start(Args) ->
+    case gen_server:start({local, ?MODULE}, ?MODULE, Args, []) of
         {ok, _Pid} -> {ok, ?MODULE};
         ignore -> {error, ignore};
         {error, {already_started, _Pid}} -> {ok, ?MODULE};
         {error, Reason} -> {error, Reason}
     end.
 
+init(MailboxTTY) when erlang:is_integer(MailboxTTY) andalso MailboxTTY > 0 ->
+    {ok, #s{mailbox_len = MailboxTTY}};
 init(_) ->
     {ok, #s{}}.
 
@@ -97,21 +99,21 @@ code_change(_OldVsn, State, _Extra) ->
 check_overload(State) ->
     {message_queue_len, QLen} = process_info(self(), message_queue_len),
     if
-        QLen > ?max_mailbox_len ->
+        QLen > State#s.mailbox_len ->
             ?INT_ERR("~n~nTTY is overloaded, skip messages...~n", []),
-            restart_tty(),
+            restart_tty(State#s.mailbox_len),
             {stop, normal, State};
         true -> {noreply, State}
     end.
 
-restart_tty() ->
+restart_tty(TTYLimit) ->
     Self = self(),
     erlang:spawn(
         fun () ->
             timer:sleep(?wait_before_restart),
             Ref = erlang:monitor(process, Self),
             receive
-                {'DOWN', Ref, _, _, _} -> start()
+                {'DOWN', Ref, _, _, _} -> start(TTYLimit)
             after
                 ?wait_for_old_proc ->
                     ?INT_ERR("Cant restart tty output cause no DOWN from old proc", []),
