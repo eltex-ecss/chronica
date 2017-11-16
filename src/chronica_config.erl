@@ -366,12 +366,17 @@ read_flows([{FlowId, List} | Tail], Res) when is_atom(FlowId), is_list(List) ->
 
 read_writers([], Res) -> Res;
 read_writers([{Type, List} | Tail], Res) when erlang:is_list(List) ->
-    read_writers(Tail, [backend_tty(List, #chronica_backend{type = {Type, undefined}, format = default}) | Res]);
+    case List of
+        [{_, _} | _] ->
+            read_writers(Tail, [backend_tty(List, #chronica_backend{type = {Type, undefined}, format = default}) | Res]);
+        Params ->
+            read_writers(Tail, [#chronica_backend{type = {Type, Params}, format = default}|Res])
+    end;
 read_writers([tty | Tail], Res) ->
     read_writers(Tail, [#chronica_backend{type = {tty, undefined}, format = default} | Res]);
 read_writers([{tty, Format} | Tail], Res) ->
     read_writers(Tail, [#chronica_backend{type = {tty, undefined}, format = Format} | Res]);
-read_writers([{Type, Params} |Tail], Res) ->
+read_writers([{Type, Params}|Tail], Res) ->
     read_writers(Tail, [#chronica_backend{type = {Type, Params}, format = default}|Res]);
 read_writers([{Type, Params, Format}|Tail], Res) ->
     read_writers(Tail, [#chronica_backend{type = {Type, Params}, format = Format}|Res]);
